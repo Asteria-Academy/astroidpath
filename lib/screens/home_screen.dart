@@ -1,9 +1,10 @@
 // lib/screens/home_screen.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../router/app_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../router/app_router.dart';
 import '../components/double_stroke_text.dart';
+import 'draw_path.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -278,10 +279,16 @@ class _GalaxyPanel extends StatelessWidget {
     final logoSlotHeight = height * 0.18;
     final buttonSpacing = ctaWidth * 0.08;
     final runSpacing = ctaHeight * 0.35;
-    final goToWorkspace = () {
-      // TODO: arahkan ke halaman workspace kamu
-      // Navigator.pushReplacementNamed(context, AppRoutes.webview);
-    };
+    void openNewPath() {
+      Navigator.of(context).pushNamed(AppRoutes.drawPath);
+    }
+
+    void openLoadPath() {
+      Navigator.of(context).pushNamed(
+        AppRoutes.drawPath,
+        arguments: const DrawPathScreenArgs(openLoadPicker: true),
+      );
+    }
 
     return Container(
       width: width,
@@ -375,7 +382,7 @@ class _GalaxyPanel extends StatelessWidget {
                   ),
                   borderColor: const Color(0xFFFDF5FF),
                   shadowColor: const Color(0xFFE3CFFF),
-                  onTap: goToWorkspace,
+                  onTap: openNewPath,
                 ),
                 _CTAButton(
                   width: ctaWidth,
@@ -391,7 +398,7 @@ class _GalaxyPanel extends StatelessWidget {
                   ),
                   borderColor: const Color(0xFFE4FFFF),
                   shadowColor: const Color(0xFF7EE5F6),
-                  onTap: goToWorkspace,
+                  onTap: openLoadPath,
                 ),
               ],
             ),
