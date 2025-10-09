@@ -380,8 +380,8 @@ class _GalaxyPanel extends StatelessWidget {
                 _CTAButton(
                   width: ctaWidth,
                   height: ctaHeight,
-                  label: 'CONTINUE JOURNEY',
-                  icon: Icons.travel_explore_outlined,
+                  label: 'LOAD FILE',
+                  icon: Icons.folder_open_rounded,
                   iconColor: const Color.fromARGB(255, 255, 255, 255),
                   gradient: const LinearGradient(
                     colors: [
@@ -429,7 +429,7 @@ class _CTAButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(height * 0.5);
     final textStyle = GoogleFonts.titanOne(
-      fontSize: height * 0.28,
+      fontSize: height * 0.4,
       letterSpacing: 0.2,
       color: const Color.fromARGB(255, 255, 255, 255),
     );
@@ -461,9 +461,9 @@ class _CTAButton extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 // Stroke (black)
-                Icon(icon, size: height * 0.4, color: Colors.black),
+                Icon(icon, size: height * 0.45, color: Colors.black),
                 // Fill
-                Icon(icon, size: height * 0.36, color: iconColor),
+                Icon(icon, size: height * 0.42, color: iconColor),
               ],
             ),
             SizedBox(width: height * 0.24),
