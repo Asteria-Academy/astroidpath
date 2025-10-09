@@ -38,7 +38,7 @@ class HomeScreen extends StatelessWidget {
 
               // 2) Top segmented nav
               Align(
-                alignment: const Alignment(0, -0.7),
+                alignment: const Alignment(0, -0.78),
                 child: _TopSegmentedNav(
                   width: topNavW,
                   height: topNavH,
@@ -54,7 +54,7 @@ class HomeScreen extends StatelessWidget {
 
               // 3) Panel tengah (galaxy card)
               Align(
-                alignment: const Alignment(0, 0.8),
+                alignment: const Alignment(0, 0.6),
                 child: _GalaxyPanel(
                   width: panelW,
                   height: panelH,
