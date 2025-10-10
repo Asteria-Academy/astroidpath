@@ -1634,6 +1634,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     double min = 5,
     double max = 1000,
   }) {
+    var currentValue = value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1657,31 +1658,13 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               // Tombol Minus
               _stepperButton(
                 icon: Icons.remove,
-                onTap: () {
-                  if (value > min) {
-                    final next = math.max(min, value - step);
-                    if (next != value) onChanged(next);
-                  }
-                },
-                onLongPress: () {
-                  Timer? timer;
-                  timer = Timer.periodic(const Duration(milliseconds: 100), (
-                    _,
-                  ) {
-                    if (value > min) {
-                      final next = math.max(min, value - step);
-                      if (next != value) {
-                        onChanged(next);
-                      } else {
-                        timer?.cancel();
-                      }
-                    } else {
-                      timer?.cancel();
-                    }
-                  });
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    timer?.cancel();
-                  });
+                onStep: () {
+                  if (currentValue <= min) return false;
+                  final next = math.max(min, currentValue - step);
+                  if (next == currentValue) return false;
+                  currentValue = next;
+                  onChanged(next);
+                  return true;
                 },
               ),
               // Display Value
@@ -1699,17 +1682,13 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               // Tombol Plus
               _stepperButton(
                 icon: Icons.add,
-                onTap: () {
-                  if (value < max) {
-                    final next = math.min(max, value + step);
-                    if (next != value) onChanged(next);
-                  }
-                },
-                onLongPress: () {
-                  if (value < max) {
-                    final next = math.min(max, value + step * 5);
-                    if (next != value) onChanged(next);
-                  }
+                onStep: () {
+                  if (currentValue >= max) return false;
+                  final next = math.min(max, currentValue + step);
+                  if (next == currentValue) return false;
+                  currentValue = next;
+                  onChanged(next);
+                  return true;
                 },
               ),
             ],
@@ -1721,23 +1700,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
 
   Widget _stepperButton({
     required IconData icon,
-    required VoidCallback onTap,
-    required VoidCallback onLongPress,
+    required bool Function() onStep,
   }) {
-    return InkWell(
-      onLongPress: onLongPress,
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: const Color(0xFF7038F9),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: Colors.white, size: 24),
-      ),
-    );
+    return _HoldStepperButton(icon: icon, onStep: onStep);
   }
 
   Widget _floatingDialogButton({
@@ -1787,6 +1752,121 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         lengthCm: _areaLength,
         widthCm: _areaWidth,
         robotSpeed: _speed,
+      ),
+    );
+  }
+}
+
+class _HoldStepperButton extends StatefulWidget {
+  const _HoldStepperButton({required this.icon, required this.onStep});
+
+  final IconData icon;
+  final bool Function() onStep;
+
+  @override
+  State<_HoldStepperButton> createState() => _HoldStepperButtonState();
+}
+
+class _HoldStepperButtonState extends State<_HoldStepperButton> {
+  static const Duration _holdActivationDelay = Duration(milliseconds: 300);
+  static const Duration _initialRepeatDelay = Duration(milliseconds: 220);
+  static const Duration _minRepeatDelay = Duration(milliseconds: 60);
+  static const double _accelerationFactor = 0.82;
+
+  Timer? _holdTimer;
+  Timer? _repeatTimer;
+  bool _didTriggerAutoStep = false;
+  Duration _currentDelay = _initialRepeatDelay;
+
+  void _handlePointerDown(PointerDownEvent event) {
+    _startHoldCountdown();
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    _handlePointerEnd(canceled: false);
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    _handlePointerEnd(canceled: true);
+  }
+
+  void _startHoldCountdown() {
+    _cancelAllTimers();
+    _didTriggerAutoStep = false;
+    _holdTimer = Timer(_holdActivationDelay, () {
+      if (!mounted) return;
+      _didTriggerAutoStep = true;
+      if (_performStep()) {
+        _currentDelay = _initialRepeatDelay;
+        _scheduleNextStep();
+      }
+    });
+  }
+
+  void _scheduleNextStep() {
+    _repeatTimer = Timer(_currentDelay, () {
+      if (!mounted) return;
+      if (!_performStep()) return;
+      final nextDelayMs = math.max(
+        _minRepeatDelay.inMilliseconds,
+        (_currentDelay.inMilliseconds * _accelerationFactor).round(),
+      );
+      _currentDelay = Duration(milliseconds: nextDelayMs);
+      _scheduleNextStep();
+    });
+  }
+
+  bool _performStep() {
+    final applied = widget.onStep();
+    if (!applied) {
+      _cancelAllTimers();
+    }
+    return applied;
+  }
+
+  void _handlePointerEnd({required bool canceled}) {
+    final triggeredHold = _didTriggerAutoStep;
+    _cancelAllTimers();
+    _didTriggerAutoStep = false;
+    if (!canceled && !triggeredHold) {
+      widget.onStep();
+    }
+  }
+
+  void _cancelAllTimers() {
+    _holdTimer?.cancel();
+    _repeatTimer?.cancel();
+    _holdTimer = null;
+    _repeatTimer = null;
+    _currentDelay = _initialRepeatDelay;
+  }
+
+  @override
+  void dispose() {
+    _cancelAllTimers();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: _handlePointerDown,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
+      child: InkWell(
+        onTap: () {},
+        onTapCancel: () => _handlePointerEnd(canceled: true),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: const Color(0xFF7038F9),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(widget.icon, color: Colors.white, size: 24),
+        ),
       ),
     );
   }
