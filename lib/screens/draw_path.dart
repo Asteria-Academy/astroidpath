@@ -1506,76 +1506,95 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFF12264A),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF6FE2FF)),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFF6FE2FF).withOpacity(0.8),
+                ),
               ),
               child: Text(
                 'Ambil foto dari tampak atas (top-down) agar skala akurat.',
                 style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white24),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.35),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: _previewBytes == null
+                      ? const Center(
+                          child: Text(
+                            'Belum ada foto',
+                            style: TextStyle(color: Colors.white60),
+                          ),
+                        )
+                      : Image.memory(_previewBytes!, fit: BoxFit.cover),
                 ),
-                child: _previewBytes == null
-                    ? const Center(
-                        child: Text(
-                          'Belum ada foto',
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.memory(_previewBytes!, fit: BoxFit.cover),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _captureImage,
+                    icon: const Icon(Icons.photo_camera, size: 20),
+                    label: const Text('Ambil Foto'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6A4CF3),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size(0, 48),
+                      textStyle: GoogleFonts.titanOne(fontSize: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
                       ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _captureImage,
-              icon: const Icon(Icons.photo_camera),
-              label: const Text('Ambil Foto'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6A4CF3),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: GoogleFonts.titanOne(fontSize: 16),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_previewBytes != null)
-              ElevatedButton.icon(
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        Navigator.of(context).pop(_previewBytes);
-                      },
-                icon: const Icon(Icons.check),
-                label: const Text('Gunakan Foto Ini'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: GoogleFonts.titanOne(fontSize: 16),
+                    ),
+                  ),
                 ),
-              ),
+                if (_previewBytes != null) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.of(context).pop(_previewBytes);
+                            },
+                      icon: const Icon(Icons.check, size: 20),
+                      label: const Text('Gunakan'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CAF50),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        minimumSize: const Size(0, 48),
+                        textStyle: GoogleFonts.titanOne(fontSize: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
