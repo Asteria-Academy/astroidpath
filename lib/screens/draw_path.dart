@@ -1404,50 +1404,44 @@ class _SettingsDialog extends StatefulWidget {
 }
 
 class _SettingsDialogState extends State<_SettingsDialog> {
-  late final TextEditingController _lengthController;
-  late final TextEditingController _widthController;
   late double _speed;
+  late double _areaLength;
+  late double _areaWidth;
+
+  double _normalizeDimension(double? value) {
+    final raw = value ?? 100.0;
+    final clamped = raw.clamp(5.0, 500.0).toDouble();
+    final steps = (clamped / 5.0).round();
+    return (steps * 5).toDouble();
+  }
 
   @override
   void initState() {
     super.initState();
-    _lengthController = TextEditingController(
-      text: widget.initialLength?.toStringAsFixed(0) ?? '',
-    );
-    _widthController = TextEditingController(
-      text: widget.initialWidth?.toStringAsFixed(0) ?? '',
-    );
     _speed = widget.initialSpeed;
-  }
-
-  @override
-  void dispose() {
-    _lengthController.dispose();
-    _widthController.dispose();
-    super.dispose();
+    _areaLength = _normalizeDimension(widget.initialLength);
+    _areaWidth = _normalizeDimension(widget.initialWidth);
   }
 
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final bottomInset = media.viewInsets.bottom;
     final cardWidth = math.min(380.0, media.size.width * 0.78);
     final availableHeight = media.size.height - 120;
     const minCardHeight = 340.0;
     const maxCardHeight = 440.0;
+
     double cardHeight = math.min(
       maxCardHeight,
       math.max(minCardHeight, availableHeight),
     );
     final buttonSize = 70.0;
-
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       backgroundColor: Colors.transparent,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.only(bottom: bottomInset),
+      child: MediaQuery.removeViewInsets(
+        removeBottom: true,
+        context: context,
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: cardWidth + buttonSize + 32),
@@ -1457,6 +1451,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
               children: [
                 Container(
                   width: cardWidth,
+                  height: cardHeight,
                   decoration: BoxDecoration(
                     color: const Color(0xFF5F35F5),
                     borderRadius: BorderRadius.circular(32),
@@ -1472,116 +1467,156 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                       ),
                     ],
                   ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: cardHeight,
-                      maxHeight: cardHeight,
-                    ),
+                  child: SizedBox(
+                    height: cardHeight,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(26, 26, 26, 26),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'PENGATURAN AREA',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.titanOne(
-                              color: Colors.white,
-                              fontSize: 24,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          _buildNumberField(
-                            controller: _lengthController,
-                            label: 'Area Length (cm)',
-                          ),
-                          const SizedBox(height: 14),
-                          _buildNumberField(
-                            controller: _widthController,
-                            label: 'Area Width (cm)',
-                          ),
-                          const SizedBox(height: 18),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  'ROBOT SPEED (0% - 100%) : ${_speed.toStringAsFixed(0)}%',
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.4,
+                      child: LayoutBuilder(
+                        builder: (context, c) {
+                          return SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: c.maxHeight,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                // KUNCI: spaceBetween biar slider “nempel” bawah tanpa Expanded
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // ====== TOP GROUP: title + fields ======
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'PENGATURAN AREA',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.titanOne(
+                                          color: Colors.white,
+                                          fontSize: 24,
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _buildStepperField(
+                                        label: 'Area Length',
+                                        value: _areaLength,
+                                        onChanged: (val) => setState(
+                                          () => _areaLength =
+                                              _normalizeDimension(val),
+                                        ),
+                                        step: 5.0, // increment 5cm
+                                        max: 500,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      _buildStepperField(
+                                        label: 'Area Width',
+                                        value: _areaWidth,
+                                        onChanged: (val) => setState(
+                                          () => _areaWidth =
+                                              _normalizeDimension(val),
+                                        ),
+                                        step: 5.0,
+                                        max: 500,
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const SizedBox(height: 10),
-                                SliderTheme(
-                                  data: SliderTheme.of(context).copyWith(
-                                    trackHeight: 8,
-                                    thumbShape: const RoundSliderThumbShape(
-                                      enabledThumbRadius: 12,
-                                    ),
-                                    overlayShape: const RoundSliderOverlayShape(
-                                      overlayRadius: 18,
-                                    ),
-                                    activeTrackColor: const Color(0xFFE4B9FF),
-                                    inactiveTrackColor: Colors.white
-                                        .withOpacity(0.24),
-                                    thumbColor: const Color(0xFFF7EDFF),
-                                    showValueIndicator:
-                                        ShowValueIndicator.onDrag,
-                                    valueIndicatorColor: const Color(
-                                      0xFF7B4BF2,
-                                    ),
-                                    valueIndicatorTextStyle:
-                                        GoogleFonts.poppins(
-                                          fontSize: 12,
+
+                                  // ====== BOTTOM GROUP: slider speed ======
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(height: 18),
+                                      Text(
+                                        'ROBOT SPEED (0% - 100%) : ${_speed.toStringAsFixed(0)}%',
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
                                           fontWeight: FontWeight.w700,
                                           color: Colors.white,
+                                          letterSpacing: 0.4,
                                         ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      SliderTheme(
+                                        data: SliderTheme.of(context).copyWith(
+                                          trackHeight: 8,
+                                          thumbShape:
+                                              const RoundSliderThumbShape(
+                                                enabledThumbRadius: 12,
+                                              ),
+                                          overlayShape:
+                                              const RoundSliderOverlayShape(
+                                                overlayRadius: 18,
+                                              ),
+                                          activeTrackColor: const Color(
+                                            0xFFE4B9FF,
+                                          ),
+                                          inactiveTrackColor: Colors.white
+                                              .withOpacity(0.24),
+                                          thumbColor: const Color(0xFFF7EDFF),
+                                          showValueIndicator:
+                                              ShowValueIndicator.onDrag,
+                                          valueIndicatorColor: const Color(
+                                            0xFF7B4BF2,
+                                          ),
+                                          valueIndicatorTextStyle:
+                                              GoogleFonts.poppins(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                        ),
+                                        child: Slider(
+                                          value: _speed,
+                                          min: 0,
+                                          max: 100,
+                                          divisions: 100,
+                                          label:
+                                              '${_speed.toStringAsFixed(0)}%',
+                                          onChanged: (value) {
+                                            setState(() => _speed = value);
+                                          },
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  child: Slider(
-                                    value: _speed,
-                                    min: 0,
-                                    max: 100,
-                                    divisions: 100,
-                                    label: '${_speed.toStringAsFixed(0)}%',
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _speed = value;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 20),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _floatingDialogButton(
-                      icon: Icons.check_rounded,
-                      accentColor: const Color(0xFF7038F9),
-                      onTap: _onSave,
-                      size: buttonSize,
-                    ),
-                    const SizedBox(height: 16),
-                    _floatingDialogButton(
-                      icon: Icons.close_rounded,
-                      accentColor: const Color(0xFFFF7A1A),
-                      onTap: () => Navigator.pop(context),
-                      size: buttonSize,
-                    ),
-                  ],
+                SizedBox(
+                  height: cardHeight,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _floatingDialogButton(
+                        icon: Icons.check_rounded,
+                        accentColor: const Color(0xFF7038F9),
+                        onTap: _onSave,
+                        size: buttonSize,
+                      ),
+                      const SizedBox(height: 16),
+                      _floatingDialogButton(
+                        icon: Icons.close_rounded,
+                        accentColor: const Color(0xFFFF7A1A),
+                        onTap: () => Navigator.pop(context),
+                        size: buttonSize,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1591,41 +1626,116 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     );
   }
 
-  Widget _buildNumberField({
-    required TextEditingController controller,
+  Widget _buildStepperField({
     required String label,
+    required double value,
+    required Function(double) onChanged,
+    double step = 1.0,
+    double min = 5,
+    double max = 1000,
   }) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: GoogleFonts.poppins(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Colors.white.withOpacity(0.75),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withOpacity(0.8),
+          ),
         ),
-        filled: true,
-        fillColor: const Color(0xFF6D49F8),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 14,
-          horizontal: 18,
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              // Tombol Minus
+              _stepperButton(
+                icon: Icons.remove,
+                onTap: () {
+                  if (value > min) {
+                    final next = math.max(min, value - step);
+                    if (next != value) onChanged(next);
+                  }
+                },
+                onLongPress: () {
+                  Timer? timer;
+                  timer = Timer.periodic(const Duration(milliseconds: 100), (
+                    _,
+                  ) {
+                    if (value > min) {
+                      final next = math.max(min, value - step);
+                      if (next != value) {
+                        onChanged(next);
+                      } else {
+                        timer?.cancel();
+                      }
+                    } else {
+                      timer?.cancel();
+                    }
+                  });
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    timer?.cancel();
+                  });
+                },
+              ),
+              // Display Value
+              Expanded(
+                child: Text(
+                  '${value.toStringAsFixed(0)} cm',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              // Tombol Plus
+              _stepperButton(
+                icon: Icons.add,
+                onTap: () {
+                  if (value < max) {
+                    final next = math.min(max, value + step);
+                    if (next != value) onChanged(next);
+                  }
+                },
+                onLongPress: () {
+                  if (value < max) {
+                    final next = math.min(max, value + step * 5);
+                    if (next != value) onChanged(next);
+                  }
+                },
+              ),
+            ],
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
+      ],
+    );
+  }
+
+  Widget _stepperButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required VoidCallback onLongPress,
+  }) {
+    return InkWell(
+      onLongPress: onLongPress,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: const Color(0xFF7038F9),
+          borderRadius: BorderRadius.circular(12),
         ),
-        hintStyle: GoogleFonts.poppins(
-          color: Colors.white.withOpacity(0.35),
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      style: GoogleFonts.poppins(
-        color: Colors.white,
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
+        child: Icon(icon, color: Colors.white, size: 24),
       ),
     );
   }
@@ -1665,20 +1775,19 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   }
 
   void _onSave() {
-    final length = double.tryParse(_lengthController.text);
-    final width = double.tryParse(_widthController.text);
-    if (length == null || width == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Isi panjang dan lebar meja dengan angka.'),
-        ),
-      );
+    if (_areaLength <= 0 || _areaWidth <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Ukuran meja tidak valid.')));
       return;
     }
-    FocusScope.of(context).unfocus();
     Navigator.pop(
       context,
-      _SettingsResult(lengthCm: length, widthCm: width, robotSpeed: _speed),
+      _SettingsResult(
+        lengthCm: _areaLength,
+        widthCm: _areaWidth,
+        robotSpeed: _speed,
+      ),
     );
   }
 }
