@@ -58,10 +58,51 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
 
   CellCoordinate? _lastInteractionCell;
 
+  static const double _kToolRailCollapsedSize = 48;
+  static const double _kToolRailMinWidth = 88;
+  static const double _kToolRailMinHeight = 260;
+
+  Offset? _toolRailOffset;
+  bool _toolRailCollapsed = false;
+
   bool get _hasImage => _capturedImageBytes != null;
   bool get _hasValidGrid =>
       _hasImage && _rows != null && _cols != null && _rows! > 0 && _cols! > 0;
   bool get _isSimulating => _simulationTimer != null;
+
+  Offset _defaultToolRailOffset(Size boardSize) {
+    return Offset(boardSize.width * 0.04, boardSize.height * 0.08);
+  }
+
+  Size _resolveToolRailSize({
+    required bool collapsed,
+    required Size boardSize,
+    required double expandedWidth,
+    required double expandedHeight,
+  }) {
+    final width = collapsed
+        ? math.min(boardSize.width, _kToolRailCollapsedSize)
+        : math.min(
+            boardSize.width,
+            math.max(_kToolRailMinWidth, expandedWidth),
+          );
+    final height = collapsed
+        ? math.min(boardSize.height, _kToolRailCollapsedSize)
+        : math.min(
+            boardSize.height,
+            math.max(_kToolRailMinHeight, expandedHeight),
+          );
+    return Size(width, height);
+  }
+
+  Offset _clampToolRailOffset(Offset candidate, Size boardSize, Size railSize) {
+    final maxDx = math.max(0.0, boardSize.width - railSize.width);
+    final maxDy = math.max(0.0, boardSize.height - railSize.height);
+    return Offset(
+      candidate.dx.clamp(0.0, maxDx),
+      candidate.dy.clamp(0.0, maxDy),
+    );
+  }
 
   @override
   void initState() {
@@ -162,7 +203,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                     final boardWidth = w - (boardLeft + boardRight);
                     final boardHeight = h - (boardTop + boardBottom);
                     final toolRailW = boardWidth * 0.1;
-                    final toolRailMaxH = h * 0.74; // jaga tidak overflow
+                    final toolRailMaxH = h * 0.8; // jaga tidak overflow
 
                     return Stack(
                       children: [
@@ -182,12 +223,11 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                           child: _buildBoardArea(),
                         ),
 
-                        Positioned(
-                          left: boardLeft + (w * 0.02),
-                          top: boardTop + (h * 0.05),
-                          width: toolRailW,
-                          height: toolRailMaxH,
-                          child: _buildToolRail(),
+                        _buildFloatingToolRail(
+                          boardOrigin: Offset(boardLeft, boardTop),
+                          boardSize: Size(boardWidth, boardHeight),
+                          expandedWidth: toolRailW,
+                          expandedHeight: toolRailMaxH,
                         ),
                       ],
                     );
@@ -240,47 +280,227 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
     );
   }
 
-  Widget _buildToolRail() {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 88, minHeight: 320),
+  Widget _buildFloatingToolRail({
+    required Offset boardOrigin,
+    required Size boardSize,
+    required double expandedWidth,
+    required double expandedHeight,
+  }) {
+    final resolvedSize = _resolveToolRailSize(
+      collapsed: _toolRailCollapsed,
+      boardSize: boardSize,
+      expandedWidth: expandedWidth,
+      expandedHeight: expandedHeight,
+    );
+    final defaultOffset = _defaultToolRailOffset(boardSize);
+    final clampedOffset = _clampToolRailOffset(
+      _toolRailOffset ?? defaultOffset,
+      boardSize,
+      resolvedSize,
+    );
+    _toolRailOffset = clampedOffset;
+
+    void adjustOffset(Offset delta) {
+      if (delta == Offset.zero) return;
+      setState(() {
+        final size = _resolveToolRailSize(
+          collapsed: _toolRailCollapsed,
+          boardSize: boardSize,
+          expandedWidth: expandedWidth,
+          expandedHeight: expandedHeight,
+        );
+        final nextOffset = _clampToolRailOffset(
+          (_toolRailOffset ?? defaultOffset) + delta,
+          boardSize,
+          size,
+        );
+        if (nextOffset != _toolRailOffset) {
+          _toolRailOffset = nextOffset;
+        }
+      });
+    }
+
+    void toggleCollapsed() {
+      setState(() {
+        _toolRailCollapsed = !_toolRailCollapsed;
+        final size = _resolveToolRailSize(
+          collapsed: _toolRailCollapsed,
+          boardSize: boardSize,
+          expandedWidth: expandedWidth,
+          expandedHeight: expandedHeight,
+        );
+        final nextOffset = _clampToolRailOffset(
+          _toolRailOffset ?? defaultOffset,
+          boardSize,
+          size,
+        );
+        _toolRailOffset = nextOffset;
+      });
+    }
+
+    return Positioned(
+      left: boardOrigin.dx + clampedOffset.dx,
+      top: boardOrigin.dy + clampedOffset.dy,
+      child: SizedBox(
+        width: resolvedSize.width,
+        height: resolvedSize.height,
+        child: _buildToolRail(
+          collapsed: _toolRailCollapsed,
+          onToggleCollapsed: toggleCollapsed,
+          onDragUpdate: adjustOffset,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolRail({
+    required bool collapsed,
+    required VoidCallback onToggleCollapsed,
+    required void Function(Offset delta) onDragUpdate,
+  }) {
+    if (collapsed) {
+      return _buildCollapsedToolRail(
+        onToggleCollapsed: onToggleCollapsed,
+        onDragUpdate: onDragUpdate,
+      );
+    }
+    return _buildExpandedToolRail(
+      onToggleCollapsed: onToggleCollapsed,
+      onDragUpdate: onDragUpdate,
+    );
+  }
+
+  Widget _buildCollapsedToolRail({
+    required VoidCallback onToggleCollapsed,
+    required void Function(Offset delta) onDragUpdate,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onToggleCollapsed,
+      onPanUpdate: (details) {
+        if (details.delta == Offset.zero) return;
+        onDragUpdate(details.delta);
+      },
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xF2F2F2).withOpacity(0.92),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color.fromARGB(255, 9, 9, 9).withOpacity(0.25),
+              blurRadius: 14,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(6),
+            child: Icon(Icons.visibility, color: Color(0xFF4B3D8A), size: 20),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedToolRail({
+    required VoidCallback onToggleCollapsed,
+    required void Function(Offset delta) onDragUpdate,
+  }) {
+    const handleColor = Color(0xFF4B3D8A);
+    final shadowColor = const Color.fromARGB(255, 9, 9, 9).withOpacity(0.28);
+
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xDFDFDF).withOpacity(0.8),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xF2F2F2).withOpacity(0.9),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: const Color.fromARGB(255, 9, 9, 9).withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 12),
+            color: shadowColor,
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      padding: EdgeInsets.symmetric(
-        vertical: MediaQuery.of(context).size.height * 0.02,
-        horizontal: MediaQuery.of(context).size.width * 0.01,
-      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _ToolRailButton(icon: Icons.photo_camera_rounded, onTap: _openCamera),
-          _ToolRailButton(
-            icon: Icons.create_rounded,
-            highlight: _activeTool == DrawTool.pencil,
-            disabled: !_hasValidGrid,
-            onTap: () {
-              if (!_hasValidGrid) return;
-              setState(() => _activeTool = DrawTool.pencil);
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanUpdate: (details) {
+              if (details.delta == Offset.zero) return;
+              onDragUpdate(details.delta);
             },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.16),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(14),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.drag_indicator_rounded,
+                    color: handleColor,
+                    size: 20,
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: onToggleCollapsed,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.visibility_off,
+                        color: handleColor,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          _ToolRailButton(
-            icon: Icons.crop_square_rounded,
-            highlight: _activeTool == DrawTool.erase,
-            disabled: !_hasValidGrid,
-            onTap: () {
-              if (!_hasValidGrid) return;
-              setState(() => _activeTool = DrawTool.erase);
-            },
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _ToolRailButton(
+                    icon: Icons.photo_camera_rounded,
+                    onTap: _openCamera,
+                  ),
+                  _ToolRailButton(
+                    icon: Icons.create_rounded,
+                    highlight: _activeTool == DrawTool.pencil,
+                    disabled: !_hasValidGrid,
+                    onTap: () {
+                      if (!_hasValidGrid) return;
+                      setState(() => _activeTool = DrawTool.pencil);
+                    },
+                  ),
+                  _ToolRailButton(
+                    icon: Icons.crop_square_rounded,
+                    highlight: _activeTool == DrawTool.erase,
+                    disabled: !_hasValidGrid,
+                    onTap: () {
+                      if (!_hasValidGrid) return;
+                      setState(() => _activeTool = DrawTool.erase);
+                    },
+                  ),
+                  _ToolRailButton(
+                    icon: Icons.settings,
+                    onTap: _openSettingsDialog,
+                  ),
+                ],
+              ),
+            ),
           ),
-          _ToolRailButton(icon: Icons.settings, onTap: _openSettingsDialog),
         ],
       ),
     );
@@ -1091,6 +1311,18 @@ class _ToolRailButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mediaSize = MediaQuery.of(context).size;
+    final shortestSide = math.min(mediaSize.width, mediaSize.height);
+    final iconSize = shortestSide * 0.035;
+    final verticalPadding = shortestSide * 0.012;
+    final horizontalPadding = shortestSide * 0.008;
+    final borderRadiusValue = shortestSide * 0.03;
+
+    final clampedIconSize = iconSize.clamp(20.0, 28.0);
+    final clampedVerticalPadding = verticalPadding.clamp(6.0, 12.0);
+    final clampedHorizontalPadding = horizontalPadding.clamp(6.0, 12.0);
+    final clampedBorderRadius = borderRadiusValue.clamp(14.0, 20.0);
+
     final enabledColor = highlight
         ? const Color.fromARGB(255, 68, 130, 255)
         : Colors.white;
@@ -1104,8 +1336,8 @@ class _ToolRailButton extends StatelessWidget {
         child: Container(
           alignment: Alignment.center,
           padding: EdgeInsets.symmetric(
-            vertical: MediaQuery.of(context).size.height * 0.03,
-            horizontal: MediaQuery.of(context).size.width * 0.01,
+            vertical: clampedVerticalPadding,
+            horizontal: clampedHorizontalPadding,
           ),
           decoration: BoxDecoration(
             gradient: highlight
@@ -1119,7 +1351,7 @@ class _ToolRailButton extends StatelessWidget {
                   )
                 : null,
             color: highlight ? null : const Color(0xFF800080),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(clampedBorderRadius),
             border: Border.all(
               color: highlight ? const Color(0xFFB5FEFF) : Colors.transparent,
               width: 2,
@@ -1128,7 +1360,7 @@ class _ToolRailButton extends StatelessWidget {
           child: Icon(
             icon,
             color: disabled ? Colors.white54 : enabledColor,
-            size: MediaQuery.of(context).size.width * 0.03,
+            size: clampedIconSize,
           ),
         ),
       ),
