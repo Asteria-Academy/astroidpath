@@ -17,7 +17,7 @@ class DrawPathScreenArgs {
   const DrawPathScreenArgs({this.openLoadPicker = false});
 }
 
-enum DrawTool { pencil, erase }
+enum DrawTool { pencil, erase, placeFinish }
 
 class DrawPathScreen extends StatefulWidget {
   const DrawPathScreen({super.key, this.initialArgs});
@@ -135,46 +135,6 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
             child: Image.asset('assets/splash/bg.png', fit: BoxFit.cover),
           ),
 
-          // SafeArea(
-          //   child: Padding(
-          //     padding: const EdgeInsets.all(20),
-          //     child: Column(
-          //       crossAxisAlignment: CrossAxisAlignment.start,
-          //       children: [
-          //         _buildTopBar(),
-          //         const SizedBox(height: 20),
-          //         Expanded(
-          //           child: LayoutBuilder(
-          //             builder: (context, constraints) {
-          //               final toolRailWidth = math.min(
-          //                 120.0,
-          //                 constraints.maxWidth * 0.12,
-          //               );
-
-          //               return Row(
-          //                 crossAxisAlignment: CrossAxisAlignment.stretch,
-          //                 children: [
-          //                   SizedBox(
-          //                     width: toolRailWidth,
-          //                     height: toolRailWidth * 2,
-          //                     child: _buildToolRail(),
-          //                   ),
-          //                   const SizedBox(width: 20),
-          //                   Expanded(child: _buildBoardArea()),
-          //                 ],
-          //               );
-          //             },
-          //           ),
-          //         ),
-          //         const SizedBox(height: 24),
-          //         Align(
-          //           alignment: Alignment.centerRight,
-          //           child: _buildActionButtons(),
-          //         ),
-          //       ],
-          //     ),
-          //   ),
-          // ),
           SafeArea(
             child: Center(
               child: Container(
@@ -495,6 +455,23 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                     },
                   ),
                   _ToolRailButton(
+                    icon: Icons.flag_rounded,
+                    highlight: _activeTool == DrawTool.placeFinish,
+                    disabled: !_hasValidGrid || _paintedCells.isEmpty,
+                    onTap: () {
+                      if (!_hasValidGrid) return;
+                      if (_paintedCells.isEmpty) {
+                        _showSnack('Gambar jalur dulu sebelum menaruh finish.');
+                        return;
+                      }
+                      setState(() {
+                        _activeTool = _activeTool == DrawTool.placeFinish
+                            ? DrawTool.pencil
+                            : DrawTool.placeFinish;
+                      });
+                    },
+                  ),
+                  _ToolRailButton(
                     icon: Icons.crop_square_rounded,
                     highlight: _activeTool == DrawTool.erase,
                     disabled: !_hasValidGrid,
@@ -591,18 +568,32 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                               Positioned.fill(
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
+                                  onDoubleTapDown: (details) =>
+                                      _handleFinishDoubleTap(
+                                        details.localPosition,
+                                        boardSize,
+                                      ),
                                   onTapDown: (details) => _handleBoardInput(
                                     details.localPosition,
                                     boardSize,
+                                    isDrag: false,
                                   ),
-                                  onPanStart: (details) => _handleBoardInput(
-                                    details.localPosition,
-                                    boardSize,
-                                  ),
-                                  onPanUpdate: (details) => _handleBoardInput(
-                                    details.localPosition,
-                                    boardSize,
-                                  ),
+                                  onPanStart:
+                                      _activeTool == DrawTool.placeFinish
+                                      ? null
+                                      : (details) => _handleBoardInput(
+                                          details.localPosition,
+                                          boardSize,
+                                          isDrag: true,
+                                        ),
+                                  onPanUpdate:
+                                      _activeTool == DrawTool.placeFinish
+                                      ? null
+                                      : (details) => _handleBoardInput(
+                                          details.localPosition,
+                                          boardSize,
+                                          isDrag: true,
+                                        ),
                                   onPanEnd: (_) => _lastInteractionCell = null,
                                   onTapUp: (_) => _lastInteractionCell = null,
                                   onTapCancel: () =>
@@ -613,6 +604,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                                       cols: _cols!,
                                       paintedCells: _paintedCells,
                                       simulatedCells: _simulatedCells,
+                                      segments: _buildDirectionalSegments(),
                                     ),
                                   ),
                                 ),
@@ -756,7 +748,11 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
 
   bool get _canSave => _getValidPath() != null && !_isSimulating;
 
-  void _handleBoardInput(Offset localPosition, Size boardSize) {
+  void _handleBoardInput(
+    Offset localPosition,
+    Size boardSize, {
+    bool isDrag = false,
+  }) {
     if (!_hasValidGrid) return;
     final cell = _positionToCell(localPosition, boardSize);
     if (cell == null) return;
@@ -769,6 +765,28 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       case DrawTool.erase:
         _eraseCell(cell);
         break;
+      case DrawTool.placeFinish:
+        if (isDrag) return;
+        _attemptPlaceFinish(
+          cell,
+          deactivateToolAfterPlacement: true,
+          showInvalidSnack: true,
+        );
+        break;
+    }
+  }
+
+  void _handleFinishDoubleTap(Offset localPosition, Size boardSize) {
+    if (!_hasValidGrid) return;
+    final cell = _positionToCell(localPosition, boardSize);
+    if (cell == null) return;
+    final placed = _attemptPlaceFinish(
+      cell,
+      deactivateToolAfterPlacement: false,
+      showInvalidSnack: true,
+    );
+    if (placed) {
+      _lastInteractionCell = null;
     }
   }
 
@@ -876,6 +894,11 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
         _startCell = cell;
         _activeRobotCell = cell;
       }
+      final shouldAutoAssignFinish =
+          _finishCell == null || !_paintedCells.contains(_finishCell!);
+      if (shouldAutoAssignFinish) {
+        _finishCell = cell;
+      }
       _markPathDirty();
     });
     return true;
@@ -898,6 +921,43 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       _simulatedCells.clear();
       _markPathDirty();
     });
+  }
+
+  bool _attemptPlaceFinish(
+    CellCoordinate cell, {
+    required bool deactivateToolAfterPlacement,
+    required bool showInvalidSnack,
+  }) {
+    if (!_paintedCells.contains(cell)) {
+      if (showInvalidSnack) {
+        _showSnack('Letakkan finish di jalur yang sudah digambar.');
+      }
+      return false;
+    }
+    final alreadyPlaced = _finishCell == cell;
+    final shouldDeactivate =
+        deactivateToolAfterPlacement && _activeTool == DrawTool.placeFinish;
+    final wasSimulating = _isSimulating;
+    if (wasSimulating) {
+      _stopSimulation();
+    }
+    if (alreadyPlaced && !shouldDeactivate) {
+      return true;
+    }
+    setState(() {
+      if (!alreadyPlaced) {
+        _finishCell = cell;
+        if (!wasSimulating) {
+          _simulatedCells.clear();
+          _activeRobotCell = _startCell;
+        }
+        _markPathDirty();
+      }
+      if (shouldDeactivate) {
+        _activeTool = DrawTool.pencil;
+      }
+    });
+    return true;
   }
 
   Iterable<CellCoordinate> _validNeighbors(CellCoordinate cell) sync* {
@@ -989,6 +1049,37 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
     if (ordered == null) return null;
     if (ordered.length < 2) return null;
     return ordered;
+  }
+
+  List<DirectedSegment> _buildDirectionalSegments() {
+    final ordered = _computeOrderedPath();
+    if (ordered == null || ordered.length < 2) {
+      return const <DirectedSegment>[];
+    }
+    final segments = <DirectedSegment>[];
+    for (var i = 0; i < ordered.length - 1; i++) {
+      final from = ordered[i];
+      final to = ordered[i + 1];
+      final direction = _directionBetween(from, to);
+      final isHighlighted =
+          _simulatedCells.contains(to) || _activeRobotCell == to;
+      segments.add(
+        DirectedSegment(
+          from: from,
+          to: to,
+          direction: direction,
+          isHighlighted: isHighlighted,
+        ),
+      );
+    }
+    return segments;
+  }
+
+  CellDirection _directionBetween(CellCoordinate from, CellCoordinate to) {
+    if (to.row < from.row) return CellDirection.north;
+    if (to.row > from.row) return CellDirection.south;
+    if (to.col > from.col) return CellDirection.east;
+    return CellDirection.west;
   }
 
   double get _pathLengthMeters {
@@ -1377,6 +1468,22 @@ class CellCoordinate {
 
 enum MarkerType { start, finish }
 
+enum CellDirection { north, east, south, west }
+
+class DirectedSegment {
+  DirectedSegment({
+    required this.from,
+    required this.to,
+    required this.direction,
+    required this.isHighlighted,
+  });
+
+  final CellCoordinate from;
+  final CellCoordinate to;
+  final CellDirection direction;
+  final bool isHighlighted;
+}
+
 class _ToolRailButton extends StatelessWidget {
   const _ToolRailButton({
     required this.icon,
@@ -1455,12 +1562,14 @@ class _BoardPainter extends CustomPainter {
     required this.cols,
     required this.paintedCells,
     required this.simulatedCells,
+    required this.segments,
   });
 
   final int rows;
   final int cols;
   final Set<CellCoordinate> paintedCells;
   final Set<CellCoordinate> simulatedCells;
+  final List<DirectedSegment> segments;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1497,6 +1606,76 @@ class _BoardPainter extends CustomPainter {
       canvas.drawRect(rect, simulatedPaint);
     }
 
+    if (segments.isNotEmpty) {
+      // Draw direction arrows between ordered cells (default + simulated styles).
+      final minExtent = math.min(cellWidth, cellHeight);
+      final baseStroke = math.max(1.8, minExtent * 0.14);
+      final highlightStroke = math.min(minExtent * 0.26, baseStroke * 1.4);
+      final arrowPadding = minExtent * 0.18;
+      final maxHeadLength = minExtent * 0.32;
+      final baseColor = const Color(0xFF4FA9FF);
+      final highlightColor = const Color(0xFFFFC960);
+
+      for (final segment in segments) {
+        final color = segment.isHighlighted ? highlightColor : baseColor;
+        final strokeWidth = segment.isHighlighted
+            ? highlightStroke
+            : baseStroke;
+        final startCenter = Offset(
+          (segment.from.col + 0.5) * cellWidth,
+          (segment.from.row + 0.5) * cellHeight,
+        );
+        final endCenter = Offset(
+          (segment.to.col + 0.5) * cellWidth,
+          (segment.to.row + 0.5) * cellHeight,
+        );
+        final delta = endCenter - startCenter;
+        final distance = delta.distance;
+        if (distance == 0) {
+          continue;
+        }
+        final unit = delta / distance;
+        final start = startCenter + unit * arrowPadding;
+        final end = endCenter - unit * arrowPadding;
+        final drawableDelta = end - start;
+        final drawableLength = drawableDelta.distance;
+        if (drawableLength <= 0) {
+          continue;
+        }
+        final tip = start + unit * drawableLength;
+        final headLength = math.min(maxHeadLength, drawableLength * 0.6);
+        final headBase = tip - unit * headLength;
+        final perp = Offset(-unit.dy, unit.dx);
+        final headWidth = headLength * 0.7;
+        final halfWidthVector = perp * (headWidth / 2);
+
+        final shaftPaint = Paint()
+          ..color = color
+          ..strokeWidth = strokeWidth
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round;
+
+        final headPaint = Paint()
+          ..color = color
+          ..style = PaintingStyle.fill;
+
+        canvas.drawLine(start, headBase, shaftPaint);
+
+        final headPath = Path()
+          ..moveTo(tip.dx, tip.dy)
+          ..lineTo(
+            headBase.dx + halfWidthVector.dx,
+            headBase.dy + halfWidthVector.dy,
+          )
+          ..lineTo(
+            headBase.dx - halfWidthVector.dx,
+            headBase.dy - halfWidthVector.dy,
+          )
+          ..close();
+        canvas.drawPath(headPath, headPaint);
+      }
+    }
+
     for (int r = 0; r <= rows; r++) {
       final dy = r * cellHeight;
       canvas.drawLine(Offset(0, dy), Offset(size.width, dy), gridPaint);
@@ -1511,6 +1690,7 @@ class _BoardPainter extends CustomPainter {
   bool shouldRepaint(covariant _BoardPainter oldDelegate) {
     return oldDelegate.paintedCells != paintedCells ||
         oldDelegate.simulatedCells != simulatedCells ||
+        oldDelegate.segments != segments ||
         oldDelegate.rows != rows ||
         oldDelegate.cols != cols;
   }
