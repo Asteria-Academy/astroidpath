@@ -220,6 +220,8 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
+          _buildBackButton(),
+          const SizedBox(width: 12),
           DoubleStrokeText(
             text: 'MAP & DRAW PATH',
             fontSize: math.min(MediaQuery.of(context).size.width * 0.03, 32.0),
@@ -248,6 +250,38 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBackButton() {
+    final buttonSize = math.min(MediaQuery.of(context).size.width * 0.08, 35.0);
+    debugPrint('Button size: $buttonSize');
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _handleBackToMenu,
+        borderRadius: BorderRadius.circular(100),
+        child: Container(
+          width: buttonSize,
+          height: buttonSize,
+          decoration: BoxDecoration(
+            color: const Color(0xFF7F54F9),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
       ),
     );
   }
@@ -650,6 +684,14 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
     });
   }
 
+  void _handleBackToMenu() {
+    Navigator.of(context).maybePop();
+  }
+
+  void _handleRunPathTap() {
+    _showSnack('Hubungkan robot terlebih dahulu.');
+  }
+
   Widget _buildActionButtons() {
     final simulateDisabled = !_canSimulate;
     final saveDisabled = !_canSave;
@@ -685,6 +727,15 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               ActionPillButton(
                 label: 'RUN PATH',
                 icon: Icons.play_arrow_rounded,
+                fontSize: 16,
+                onTap: _handleRunPathTap,
+                primaryColor: _kActionAccentColor,
+                isActive: false,
+              ),
+              const SizedBox(width: 12),
+              ActionPillButton(
+                label: 'LOAD',
+                icon: Icons.folder_open_rounded,
                 fontSize: 16,
                 onTap: _openLoadPicker,
                 primaryColor: _kActionAccentColor,
@@ -1454,10 +1505,13 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       screenWidth - 32.0,
       math.max(220.0, message.length * 6.5 + 96),
     );
-    final horizontalInset =
-        math.max(16.0, (screenWidth - desiredWidth) / 2);
-    final snackMargin =
-        EdgeInsets.fromLTRB(horizontalInset, 0, horizontalInset, 24);
+    final horizontalInset = math.max(16.0, (screenWidth - desiredWidth) / 2);
+    final snackMargin = EdgeInsets.fromLTRB(
+      horizontalInset,
+      0,
+      horizontalInset,
+      24,
+    );
 
     messenger.removeCurrentSnackBar();
     messenger.showSnackBar(
