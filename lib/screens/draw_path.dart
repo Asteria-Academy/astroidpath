@@ -68,6 +68,8 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   Offset? _toolRailOffset;
   bool _toolRailCollapsed = false;
   bool _actionButtonsExpanded = true;
+  DateTime? _lastSnackTimestamp;
+  String? _lastSnackMessage;
 
   bool get _hasImage => _capturedImageBytes != null;
   bool get _hasValidGrid =>
@@ -1435,9 +1437,63 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    if (!mounted) return;
+    final now = DateTime.now();
+    if (_lastSnackMessage == message &&
+        _lastSnackTimestamp != null &&
+        now.difference(_lastSnackTimestamp!) <
+            const Duration(milliseconds: 900)) {
+      return;
+    }
+    _lastSnackMessage = message;
+    _lastSnackTimestamp = now;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final desiredWidth = math.min(
+      screenWidth - 32.0,
+      math.max(220.0, message.length * 6.5 + 96),
+    );
+    final horizontalInset =
+        math.max(16.0, (screenWidth - desiredWidth) / 2);
+    final snackMargin =
+        EdgeInsets.fromLTRB(horizontalInset, 0, horizontalInset, 24);
+
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.info_outline, size: 18, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  height: 1.3,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: messenger.hideCurrentSnackBar,
+              child: const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(Icons.close, size: 18, color: Colors.white70),
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        dismissDirection: DismissDirection.horizontal,
+        backgroundColor: const Color(0xFF1B2A4A).withOpacity(0.94),
+        duration: const Duration(seconds: 2),
+        margin: snackMargin,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
   }
 }
 
@@ -1877,7 +1933,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   late double _areaWidth;
 
   double _normalizeDimension(double? value) {
-    final raw = value ?? 100.0;
+    final raw = value ?? 40.0;
     final clamped = raw.clamp(5.0, 500.0).toDouble();
     final steps = (clamped / 5.0).round();
     return (steps * 5).toDouble();
