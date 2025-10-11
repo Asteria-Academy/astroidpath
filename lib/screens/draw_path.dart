@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../components/double_stroke_text.dart';
+import '../components/action_pill_button.dart';
 
 class DrawPathScreenArgs {
   final bool openLoadPicker;
@@ -61,9 +62,12 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   static const double _kToolRailCollapsedSize = 48;
   static const double _kToolRailMinWidth = 88;
   static const double _kToolRailMinHeight = 260;
+  static const Color _kActionAccentColor = Color(0xFF4B3D8A);
+  static const Duration _kActionPanelAnimDuration = Duration(milliseconds: 220);
 
   Offset? _toolRailOffset;
   bool _toolRailCollapsed = false;
+  bool _actionButtonsExpanded = true;
 
   bool get _hasImage => _capturedImageBytes != null;
   bool get _hasValidGrid =>
@@ -228,6 +232,12 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                           boardSize: Size(boardWidth, boardHeight),
                           expandedWidth: toolRailW,
                           expandedHeight: toolRailMaxH,
+                        ),
+
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: _buildActionButtons(),
                         ),
                       ],
                     );
@@ -640,32 +650,103 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
     );
   }
 
+  void _toggleActionButtons() {
+    setState(() {
+      _actionButtonsExpanded = !_actionButtonsExpanded;
+    });
+  }
+
   Widget _buildActionButtons() {
     final simulateDisabled = !_canSimulate;
     final saveDisabled = !_canSave;
+    final hasUnsavedChanges = _orderedPathDirty;
+    final showButtons = _actionButtonsExpanded;
+    final panelPadding = showButtons
+        ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+        : const EdgeInsets.all(12);
 
-    return Wrap(
-      alignment: WrapAlignment.end,
-      spacing: 16,
-      runSpacing: 12,
-      children: [
-        _ActionButton(
-          label: 'RUN PATH',
-          onTap: () {
-            _showSnack('Run Path belum tersedia (robot belum terhubung).');
-          },
+    return AnimatedSize(
+      duration: _kActionPanelAnimDuration,
+      curve: Curves.easeInOut,
+      alignment: Alignment.centerLeft,
+      child: Container(
+        padding: panelPadding,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-        _ActionButton(
-          label: _isSimulating ? 'STOP' : 'SIMULATE',
-          onTap: _isSimulating
-              ? _stopSimulation
-              : (simulateDisabled ? null : _startSimulation),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildActionPanelToggle(),
+            if (showButtons) ...[
+              const SizedBox(width: 12),
+              ActionPillButton(
+                label: 'RUN PATH',
+                icon: Icons.play_arrow_rounded,
+                fontSize: 16,
+                onTap: _openLoadPicker,
+                primaryColor: _kActionAccentColor,
+                isActive: false,
+              ),
+              const SizedBox(width: 12),
+              ActionPillButton(
+                label: _isSimulating ? 'STOP' : 'SIMULATE',
+                icon: _isSimulating
+                    ? Icons.stop_rounded
+                    : Icons.play_circle_fill,
+                fontSize: 16,
+                onTap: _isSimulating
+                    ? _stopSimulation
+                    : (simulateDisabled ? null : _startSimulation),
+                primaryColor: _kActionAccentColor,
+                isActive: _isSimulating,
+              ),
+              const SizedBox(width: 12),
+              ActionPillButton(
+                label: 'SAVE',
+                icon: Icons.save_rounded,
+                fontSize: 16,
+                onTap: saveDisabled ? null : _saveCurrentPath,
+                primaryColor: _kActionAccentColor,
+                isActive: !saveDisabled && hasUnsavedChanges,
+              ),
+            ],
+          ],
         ),
-        _ActionButton(
-          label: 'SAVE',
-          onTap: saveDisabled ? null : _saveCurrentPath,
+      ),
+    );
+  }
+
+  Widget _buildActionPanelToggle() {
+    return Material(
+      color: _kActionAccentColor,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: _toggleActionButtons,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: AnimatedSwitcher(
+            duration: _kActionPanelAnimDuration,
+            transitionBuilder: (child, animation) =>
+                FadeTransition(opacity: animation, child: child),
+            child: Icon(
+              _actionButtonsExpanded ? Icons.chevron_right : Icons.chevron_left,
+              key: ValueKey<bool>(_actionButtonsExpanded),
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 
@@ -1361,50 +1442,6 @@ class _ToolRailButton extends StatelessWidget {
             icon,
             color: disabled ? Colors.white54 : enabledColor,
             size: clampedIconSize,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.label, this.onTap});
-
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF946BFC), Color(0xFF6A4CF3)],
-            ),
-            border: Border.all(color: const Color(0xFFE7DBFF), width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF411AD4).withOpacity(0.4),
-                blurRadius: 20,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.titanOne(
-              fontSize: 16,
-              color: Colors.white,
-              letterSpacing: 1,
-            ),
           ),
         ),
       ),
