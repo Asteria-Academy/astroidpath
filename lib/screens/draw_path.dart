@@ -11,7 +11,8 @@ import 'package:path_provider/path_provider.dart';
 import '../components/double_stroke_text.dart';
 import '../components/action_pill_button.dart';
 import '../services/ble_service.dart';
-import '../router/app_router.dart'; 
+import '../models/robot_command.dart';
+import '../router/app_router.dart';
 
 class DrawPathScreenArgs {
   final bool openLoadPicker;
@@ -309,12 +310,12 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isConnected 
+          color: isConnected
               ? const Color(0x334CAF50) // Green with 20% opacity
               : const Color(0x33FF5252), // Red with 20% opacity
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isConnected 
+            color: isConnected
                 ? const Color(0xFF4CAF50)
                 : const Color(0xFFFF5252),
             width: 2,
@@ -324,8 +325,12 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
-              color: isConnected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+              isConnected
+                  ? Icons.bluetooth_connected
+                  : Icons.bluetooth_disabled,
+              color: isConnected
+                  ? const Color(0xFF4CAF50)
+                  : const Color(0xFFFF5252),
               size: 18,
             ),
             const SizedBox(width: 8),
@@ -545,7 +550,9 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: const Color(0x33FFFFFF), // White with 20% opacity
+                        color: const Color(
+                          0x33FFFFFF,
+                        ), // White with 20% opacity
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -685,7 +692,9 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                               ),
                             Positioned.fill(
                               child: Container(
-                                color: const Color(0x2E000000), // Black with 18% opacity
+                                color: const Color(
+                                  0x2E000000,
+                                ), // Black with 18% opacity
                               ),
                             ),
                             if (_hasValidGrid)
@@ -793,7 +802,67 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       return;
     }
 
-    _showSnack('✅ Robot connected! (Path execution akan diimplementasi di step berikutnya)');
+    // Execute path ke robot
+    _executeRobotPath(path);
+  }
+
+  /// Convert path cells ke koordinat fisik dan kirim ke robot
+  Future<void> _executeRobotPath(List<CellCoordinate> path) async {
+    try {
+      // Convert cell coordinates ke physical coordinates (cm)
+      final physicalPath = _convertPathToPhysicalCoordinates(path);
+
+      // Debug: Log path info
+      debugPrint('🎯 Executing path:');
+      debugPrint('   - Total waypoints: ${path.length}');
+      debugPrint('   - Path length: ${_pathLengthMeters.toStringAsFixed(2)}m');
+      debugPrint('   - Start: ${path.first}');
+      debugPrint('   - Finish: ${path.last}');
+      debugPrint('   - Physical coordinates (first 3):');
+      for (var i = 0; i < math.min(3, physicalPath.length); i++) {
+        debugPrint(
+          '     [$i] x: ${physicalPath[i]['x']}cm, y: ${physicalPath[i]['y']}cm',
+        );
+      }
+
+      // Show feedback
+      _showSnack('📤 Mengirim jalur ke robot... (${path.length} waypoints)');
+
+      // Create command
+      final command = RobotCommand.executePath(path: physicalPath);
+
+      // Send to robot
+      final success = await _bleService.sendCommand(command);
+
+      if (success) {
+        _showSnack('✅ Jalur berhasil dikirim! Robot akan mulai bergerak.');
+        debugPrint('✅ Path execution command sent successfully');
+      } else {
+        _showSnack('❌ Gagal mengirim jalur. Coba lagi.');
+        debugPrint('❌ Failed to send path execution command');
+      }
+    } catch (e) {
+      debugPrint('❌ Execute path error: $e');
+      _showSnack('❌ Error: Gagal mengirim jalur ke robot.');
+    }
+  }
+
+  /// Convert CellCoordinate list menjadi physical coordinates dalam cm
+  List<Map<String, double>> _convertPathToPhysicalCoordinates(
+    List<CellCoordinate> path,
+  ) {
+    const cellSizeCm = 5.0; // Setiap cell = 5cm x 5cm
+
+    return path.map((cell) {
+      // Convert grid coordinate ke physical coordinate
+      // Origin (0,0) ada di top-left corner
+      // x = kolom * ukuran cell (horizontal, kanan positif)
+      // y = baris * ukuran cell (vertikal, bawah positif)
+      final x = cell.col * cellSizeCm;
+      final y = cell.row * cellSizeCm;
+
+      return {'x': x, 'y': y};
+    }).toList();
   }
 
   Widget _buildActionButtons() {
@@ -1499,7 +1568,9 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               title: Text(name, style: const TextStyle(color: Colors.white)),
               subtitle: Text(
                 'Terakhir: ${file.lastModifiedSync()}',
-                style: const TextStyle(color: Color(0x99FFFFFF)), // White with 60% opacity
+                style: const TextStyle(
+                  color: Color(0x99FFFFFF),
+                ), // White with 60% opacity
               ),
               onTap: () => Navigator.pop(context, file.path),
             );
@@ -1792,7 +1863,8 @@ class _BoardPainter extends CustomPainter {
     final cellHeight = size.height / rows;
 
     final gridPaint = Paint()
-      ..color = const Color(0x47B5F6FF) // Light cyan with 28% opacity
+      ..color =
+          const Color(0x47B5F6FF) // Light cyan with 28% opacity
       ..strokeWidth = 1;
 
     final pathPaint = Paint()
@@ -2144,7 +2216,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0x73090B27), // Dark blue with 45% opacity
+                        color: const Color(
+                          0x73090B27,
+                        ), // Dark blue with 45% opacity
                         blurRadius: 28,
                         offset: const Offset(0, 18),
                       ),
@@ -2241,7 +2315,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                           activeTrackColor: const Color(
                                             0xFFE4B9FF,
                                           ),
-                                          inactiveTrackColor: const Color(0x3DFFFFFF), // White with 24% opacity
+                                          inactiveTrackColor: const Color(
+                                            0x3DFFFFFF,
+                                          ), // White with 24% opacity
                                           thumbColor: const Color(0xFFF7EDFF),
                                           showValueIndicator:
                                               ShowValueIndicator.onDrag,
@@ -2397,7 +2473,11 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     return Material(
       color: Colors.white,
       elevation: 8,
-      shadowColor: Color.lerp(accentColor, Colors.transparent, 0.65), // 35% opacity
+      shadowColor: Color.lerp(
+        accentColor,
+        Colors.transparent,
+        0.65,
+      ), // 35% opacity
       borderRadius: radius,
       child: InkWell(
         onTap: onTap,
