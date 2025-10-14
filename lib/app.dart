@@ -7,7 +7,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Astroid Blockly',
+      title: 'Astroid Path',
       theme: ThemeData(brightness: Brightness.dark, fontFamily: 'Poppins'),
       initialRoute: AppRoutes.splash,
       onGenerateRoute: onGenerateRoute, // <- pakai router di atas

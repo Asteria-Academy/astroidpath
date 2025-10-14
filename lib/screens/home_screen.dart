@@ -48,7 +48,7 @@ class HomeScreen extends StatelessWidget {
                     // Navigator.pushReplacementNamed(context, AppRoutes.webview);
                   },
                   onTapConnect: () {
-                    // TODO: navigate ke connect
+                    Navigator.pushNamed(context, AppRoutes.connect);
                   },
                 ),
               ),

@@ -10,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../components/double_stroke_text.dart';
 import '../components/action_pill_button.dart';
+import '../services/ble_service.dart';
+import '../router/app_router.dart'; 
 
 class DrawPathScreenArgs {
   final bool openLoadPicker;
@@ -31,6 +33,7 @@ class DrawPathScreen extends StatefulWidget {
 class _DrawPathScreenState extends State<DrawPathScreen> {
   final GlobalKey _boardKey = GlobalKey();
   final ImagePicker _picker = ImagePicker();
+  final BleService _bleService = BleService();
 
   Uint8List? _capturedImageBytes;
   String? _capturedImageName;
@@ -113,6 +116,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   @override
   void initState() {
     super.initState();
+    _bleService.addListener(_onBleStateChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialArgs?.openLoadPicker == true) {
         _openLoadPicker();
@@ -120,9 +124,14 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
     });
   }
 
+  void _onBleStateChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     _simulationTimer?.cancel();
+    _bleService.removeListener(_onBleStateChanged);
     super.dispose();
   }
 
@@ -143,7 +152,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                 width: MediaQuery.of(context).size.width * 0.95,
                 height: MediaQuery.of(context).size.height * 0.89,
                 decoration: BoxDecoration(
-                  color: const Color(0x4545EBD8).withOpacity(0.4),
+                  color: const Color(0x2945EBD8), // ~16% opacity (0.4 * 0.4)
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: const Color(0xFF69C7C3), width: 2),
                 ),
@@ -249,6 +258,8 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 12),
+          _buildBleStatusBadge(),
         ],
       ),
     );
@@ -270,7 +281,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.25),
+                color: const Color(0x40000000), // Black with 25% opacity
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
@@ -284,6 +295,83 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildBleStatusBadge() {
+    final isConnected = _bleService.isConnected;
+    final batteryLevel = _bleService.batteryLevel;
+    final deviceName = _bleService.connectedDevice?.platformName ?? 'Unknown';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.pushNamed(context, AppRoutes.connect);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isConnected 
+              ? const Color(0x334CAF50) // Green with 20% opacity
+              : const Color(0x33FF5252), // Red with 20% opacity
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isConnected 
+                ? const Color(0xFF4CAF50)
+                : const Color(0xFFFF5252),
+            width: 2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isConnected ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+              color: isConnected ? const Color(0xFF4CAF50) : const Color(0xFFFF5252),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isConnected ? deviceName : 'Not Connected',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                if (isConnected && batteryLevel >= 0)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.battery_full,
+                        size: 12,
+                        color: _getBatteryColor(batteryLevel),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$batteryLevel%',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getBatteryColor(int level) {
+    if (level > 50) return const Color(0xFF4CAF50);
+    if (level > 20) return const Color(0xFFFFC107);
+    return const Color(0xFFFF5252);
   }
 
   Widget _buildFloatingToolRail({
@@ -389,11 +477,11 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       },
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xF2F2F2).withOpacity(0.92),
+          color: const Color(0xEBF2F2F2), // ~92% opacity
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: const Color.fromARGB(255, 9, 9, 9).withOpacity(0.25),
+              color: const Color(0x40090909), // Dark gray with 25% opacity
               blurRadius: 14,
               offset: const Offset(0, 10),
             ),
@@ -414,11 +502,11 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
     required void Function(Offset delta) onDragUpdate,
   }) {
     const handleColor = Color(0xFF4B3D8A);
-    final shadowColor = const Color.fromARGB(255, 9, 9, 9).withOpacity(0.28);
+    const shadowColor = Color(0x47090909); // Dark gray with 28% opacity
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xF2F2F2).withOpacity(0.9),
+        color: const Color(0xE6F2F2F2), // ~90% opacity
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -439,7 +527,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.16),
+                color: const Color(0x29FFFFFF), // White with 16% opacity
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(14),
                 ),
@@ -457,7 +545,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: const Color(0x33FFFFFF), // White with 20% opacity
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -559,7 +647,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF081021).withOpacity(0.45),
+                color: const Color(0x73081021), // Dark blue with 45% opacity
                 blurRadius: 28,
                 spreadRadius: 1,
               ),
@@ -576,7 +664,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                 );
                 return Container(
                   key: _boardKey,
-                  color: Colors.black.withOpacity(0.12),
+                  color: const Color(0x1F000000), // Black with 12% opacity
                   child: !_hasImage
                       ? Center(
                           child: Text(
@@ -597,7 +685,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                               ),
                             Positioned.fill(
                               child: Container(
-                                color: Colors.black.withOpacity(0.18),
+                                color: const Color(0x2E000000), // Black with 18% opacity
                               ),
                             ),
                             if (_hasValidGrid)
@@ -689,12 +777,29 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   }
 
   void _handleRunPathTap() {
-    _showSnack('Hubungkan robot terlebih dahulu.');
+    if (!_bleService.isConnected) {
+      _showSnack('⚠️ Hubungkan robot terlebih dahulu!');
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.pushNamed(context, AppRoutes.connect);
+        }
+      });
+      return;
+    }
+
+    final path = _getValidPath();
+    if (path == null) {
+      _showSnack('❌ Lengkapi jalur dari start ke finish terlebih dahulu.');
+      return;
+    }
+
+    _showSnack('✅ Robot connected! (Path execution akan diimplementasi di step berikutnya)');
   }
 
   Widget _buildActionButtons() {
     final simulateDisabled = !_canSimulate;
     final saveDisabled = !_canSave;
+    final runPathDisabled = !_bleService.isConnected || !_canSimulate;
     final hasUnsavedChanges = _orderedPathDirty;
     final showButtons = _actionButtonsExpanded;
     final panelPadding = showButtons
@@ -712,7 +817,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
           borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.25),
+              color: const Color(0x40000000), // Black with 25% opacity
               blurRadius: 16,
               offset: const Offset(0, 10),
             ),
@@ -728,9 +833,9 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                 label: 'RUN PATH',
                 icon: Icons.play_arrow_rounded,
                 fontSize: 16,
-                onTap: _handleRunPathTap,
+                onTap: runPathDisabled ? null : _handleRunPathTap,
                 primaryColor: _kActionAccentColor,
-                isActive: false,
+                isActive: _bleService.isConnected && !runPathDisabled,
               ),
               const SizedBox(width: 12),
               ActionPillButton(
@@ -1394,7 +1499,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               title: Text(name, style: const TextStyle(color: Colors.white)),
               subtitle: Text(
                 'Terakhir: ${file.lastModifiedSync()}',
-                style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                style: const TextStyle(color: Color(0x99FFFFFF)), // White with 60% opacity
               ),
               onTap: () => Navigator.pop(context, file.path),
             );
@@ -1541,7 +1646,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
         ),
         behavior: SnackBarBehavior.floating,
         dismissDirection: DismissDirection.horizontal,
-        backgroundColor: const Color(0xFF1B2A4A).withOpacity(0.94),
+        backgroundColor: const Color(0xF01B2A4A), // Dark blue with 94% opacity
         duration: const Duration(seconds: 2),
         margin: snackMargin,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1687,14 +1792,14 @@ class _BoardPainter extends CustomPainter {
     final cellHeight = size.height / rows;
 
     final gridPaint = Paint()
-      ..color = const Color(0xFFB5F6FF).withOpacity(0.28)
+      ..color = const Color(0x47B5F6FF) // Light cyan with 28% opacity
       ..strokeWidth = 1;
 
     final pathPaint = Paint()
-      ..color = const Color(0xFF83F8C5).withOpacity(0.75);
+      ..color = const Color(0xBF83F8C5); // Mint green with 75% opacity
 
     final simulatedPaint = Paint()
-      ..color = const Color(0xFF4CD4FF).withOpacity(0.5);
+      ..color = const Color(0x804CD4FF); // Bright cyan with 50% opacity
 
     for (final cell in paintedCells) {
       final rect = Rect.fromLTWH(
@@ -1843,13 +1948,13 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
                 color: const Color(0xFF12264A),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: const Color(0xFF6FE2FF).withOpacity(0.8),
+                  color: const Color(0xCC6FE2FF), // Cyan with 80% opacity
                 ),
               ),
               child: Text(
                 'Ambil foto dari tampak atas (top-down) agar skala akurat.',
                 style: GoogleFonts.poppins(
-                  color: Colors.white.withOpacity(0.9),
+                  color: const Color(0xE6FFFFFF), // White with 90% opacity
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                   height: 1.3,
@@ -1862,7 +1967,7 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
                 borderRadius: BorderRadius.circular(18),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.35),
+                    color: const Color(0x59000000), // Black with 35% opacity
                     border: Border.all(color: Colors.white24),
                   ),
                   child: _previewBytes == null
@@ -2039,7 +2144,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF090B27).withOpacity(0.45),
+                        color: const Color(0x73090B27), // Dark blue with 45% opacity
                         blurRadius: 28,
                         offset: const Offset(0, 18),
                       ),
@@ -2136,8 +2241,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                           activeTrackColor: const Color(
                                             0xFFE4B9FF,
                                           ),
-                                          inactiveTrackColor: Colors.white
-                                              .withOpacity(0.24),
+                                          inactiveTrackColor: const Color(0x3DFFFFFF), // White with 24% opacity
                                           thumbColor: const Color(0xFFF7EDFF),
                                           showValueIndicator:
                                               ShowValueIndicator.onDrag,
@@ -2221,13 +2325,13 @@ class _SettingsDialogState extends State<_SettingsDialog> {
           style: GoogleFonts.poppins(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Colors.white.withOpacity(0.8),
+            color: const Color(0xCCFFFFFF), // White with 80% opacity
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: const Color(0x26FFFFFF), // White with 15% opacity
             borderRadius: BorderRadius.circular(16),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -2293,7 +2397,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     return Material(
       color: Colors.white,
       elevation: 8,
-      shadowColor: accentColor.withOpacity(0.35),
+      shadowColor: Color.lerp(accentColor, Colors.transparent, 0.65), // 35% opacity
       borderRadius: radius,
       child: InkWell(
         onTap: onTap,
