@@ -140,12 +140,12 @@ class _StatusIndicator extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         border: Border.all(
-          color: const Color(0xFF73F0FF).withOpacity(0.4),
+          color: const Color.fromARGB(102, 115, 240, 255),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: glowColor.withOpacity(0.25),
+            color: Color.fromARGB(64, glowColor.red, glowColor.green, glowColor.blue), // ignore: deprecated_member_use
             blurRadius: 32,
             spreadRadius: 4,
           ),
@@ -161,7 +161,7 @@ class _StatusIndicator extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: glowColor.withOpacity(0.5),
+                    color: Color.fromARGB(128, glowColor.red, glowColor.green, glowColor.blue), // ignore: deprecated_member_use,
                     blurRadius: 40,
                     spreadRadius: 10,
                   ),
@@ -200,7 +200,7 @@ class _StatusIndicator extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.7),
+                color: const Color.fromARGB(179, 255, 255, 255),
               ),
             ),
           ],
@@ -218,7 +218,7 @@ class _StatusIndicator extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                 ),
                 elevation: 8,
-                shadowColor: const Color(0xFF41D8FF).withOpacity(0.5),
+                shadowColor: const Color.fromARGB(128, 65, 216, 255),
               ),
               child: Text(
                 buttonText!,

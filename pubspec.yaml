@@ -1,4 +1,4 @@
-name: astroidpath_app
+name: astroid_trail
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -38,8 +38,9 @@ dependencies:
   google_fonts: ^6.3.2
   image_picker: ^1.2.0
   path_provider: ^2.1.5
-  flutter_blue_plus: ^1.32.12
+  flutter_blue_plus: ^2.0.0
   permission_handler: ^11.3.1
+  flutter_launcher_icons: ^0.14.4
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -94,3 +95,30 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/brand/icon.png"
+  web:
+    generate: true
+    image_path: "assets/brand/icon.png"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "assets/brand/icon.png"
+    icon_size: 48 # min:48, max:256, default: 48
+  macos:
+    generate: true
+    image_path: "assets/brand/icon.png"
+
+flutter_native_splash:
+  color: "#0B1433"
+  image: assets/brand/logo.png
+  android_12:
+    color: "#0B1433"
+    image: assets/brand/logo.png
+  ios: true
+  android: true
+  web: false

@@ -13,62 +13,65 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0B1433),
-      body: LayoutBuilder(
-        builder: (context, c) {
-          final w = c.maxWidth;
-          final h = c.maxHeight;
+      body: Stack(
+        children: [
+          // 1) Galaxy background
+          Positioned.fill(
+            child: Image.asset('assets/splash/bg.png', fit: BoxFit.cover),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final w = c.maxWidth;
+                final h = c.maxHeight;
 
-          // Skala responsif (selaras dengan splash)
-          final topNavW = math.min(w * 0.5, 520.0);
-          final topNavH = math.min(h * 0.15, 72.0);
+                // Skala responsif (selaras dengan splash)
+                final topNavW = math.min(w * 0.5, 520.0);
+                final topNavH = math.min(h * 0.15, 72.0);
 
-          final panelW = math.min(w * 0.78, 960.0);
-          final panelH = math.min(h * 0.66, 380.0);
+                final panelW = math.min(w * 0.78, 960.0);
+                final panelH = math.min(h * 0.66, 380.0);
 
-          final subtitleFont = math.min(w * 0.03, 20.0);
+                final subtitleFont = math.min(w * 0.03, 20.0);
 
-          final ctaW = math.min(w * 0.22, 320.0);
-          final ctaH = math.min(h * 0.10, 64.0);
+                final ctaW = math.min(w * 0.22, 320.0);
+                final ctaH = math.min(h * 0.10, 64.0);
 
-          return Stack(
-            children: [
-              // 1) Galaxy background
-              Positioned.fill(
-                child: Image.asset('assets/splash/bg.png', fit: BoxFit.cover),
-              ),
+                return Stack(
+                  children: [
+                    // 2) Top segmented nav
+                    Align(
+                      alignment: const Alignment(0, -0.78),
+                      child: _TopSegmentedNav(
+                        width: topNavW,
+                        height: topNavH,
+                        onTapHome: () {},
+                        onTapWorkspace: () {
+                          // Navigator.pushReplacementNamed(context, AppRoutes.webview);
+                        },
+                        onTapConnect: () {
+                          Navigator.pushNamed(context, AppRoutes.connect);
+                        },
+                      ),
+                    ),
 
-              // 2) Top segmented nav
-              Align(
-                alignment: const Alignment(0, -0.78),
-                child: _TopSegmentedNav(
-                  width: topNavW,
-                  height: topNavH,
-                  onTapHome: () {},
-                  onTapWorkspace: () {
-                    // Navigator.pushReplacementNamed(context, AppRoutes.webview);
-                  },
-                  onTapConnect: () {
-                    Navigator.pushNamed(context, AppRoutes.connect);
-                  },
-                ),
-              ),
-
-              // 3) Panel tengah (galaxy card)
-              Align(
-                alignment: const Alignment(0, 0.6),
-                child: _GalaxyPanel(
-                  width: panelW,
-                  height: panelH,
-                  subtitleFont: subtitleFont,
-                  ctaWidth: ctaW,
-                  ctaHeight: ctaH,
-                ),
-              ),
-
-              // 4) Frame HUD overlay paling atas (seperti di splash)
-            ],
-          );
-        },
+                    // 3) Panel tengah (galaxy card)
+                    Align(
+                      alignment: const Alignment(0, 0.6),
+                      child: _GalaxyPanel(
+                        width: panelW,
+                        height: panelH,
+                        subtitleFont: subtitleFont,
+                        ctaWidth: ctaW,
+                        ctaHeight: ctaH,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -93,7 +96,7 @@ class _TopSegmentedNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(height * 0.45);
     final segmentHeight = height - (height * 0.28);
-    final dividerColor = const Color(0xFFA4F2FF).withOpacity(0.4);
+    final dividerColor = const Color.fromARGB(102, 164, 242, 255);
 
     return Container(
       width: width,
@@ -110,12 +113,12 @@ class _TopSegmentedNav extends StatelessWidget {
           end: Alignment.bottomCenter,
         ),
         border: Border.all(
-          color: const Color(0xFF73F0FF).withOpacity(0.8),
+          color: const Color.fromARGB(204, 115, 240, 255),
           width: 2.4,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6AE8FF).withOpacity(0.28),
+            color: const Color.fromARGB(71, 106, 232, 255),
             blurRadius: 24,
             spreadRadius: 1,
           ),
@@ -211,7 +214,7 @@ class _NavPill extends StatelessWidget {
           );
     final borderColor = active
         ? const Color(0xFFA7F8FF)
-        : const Color(0xFF8BD8FF).withOpacity(0.65);
+        : const Color.fromARGB(166, 139, 216, 255);
 
     final textStyle = GoogleFonts.titanOne(
       fontSize: height * 0.25,
@@ -232,7 +235,7 @@ class _NavPill extends StatelessWidget {
           boxShadow: [
             if (active)
               BoxShadow(
-                color: const Color(0xFF80F1FF).withOpacity(0.45),
+                color: const Color.fromARGB(115, 128, 241, 255),
                 blurRadius: 18,
                 offset: const Offset(0, 6),
               ),
@@ -301,13 +304,13 @@ class _GalaxyPanel extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         border: Border.all(
-          color: const Color(0xFF73F0FF).withOpacity(0.8),
+          color: const Color.fromARGB(204, 115, 240, 255),
           width: math.max(4, height * 0.015),
         ),
 
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFB29CFF).withOpacity(0.35),
+            color: const Color.fromARGB(89, 178, 156, 255),
             blurRadius: 28,
             spreadRadius: 4,
           ),
@@ -316,7 +319,7 @@ class _GalaxyPanel extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: panelPadding,
-        ).copyWith(top: panelPadding * 7, bottom: panelPadding),
+        ).copyWith(top: panelPadding * 4, bottom: panelPadding),
         decoration: BoxDecoration(
           borderRadius: innerRadius,
           gradient: const LinearGradient(
@@ -332,7 +335,6 @@ class _GalaxyPanel extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.max,
           children: [
-            // Let the logo grow visually while keeping the layout height stable.
             SizedBox(
               height: logoSlotHeight,
               child: Align(
@@ -341,10 +343,10 @@ class _GalaxyPanel extends StatelessWidget {
                   minHeight: 0,
                   minWidth: 0,
                   maxWidth: logoVisualWidth,
-                  maxHeight: height * 0.6,
+                  maxHeight: height * 0.35,
                   alignment: Alignment.bottomCenter,
                   child: Image.asset(
-                    'assets/brand/logo.png',
+                    'assets/brand/logo_crop.png',
                     width: logoVisualWidth,
                     fit: BoxFit.contain,
                   ),
@@ -453,7 +455,7 @@ class _CTAButton extends StatelessWidget {
           border: Border.all(color: borderColor, width: height * 0.06),
           boxShadow: [
             BoxShadow(
-              color: shadowColor.withOpacity(0.55),
+              color: Color.fromARGB(140, shadowColor.red, shadowColor.green, shadowColor.blue), // ignore: deprecated_member_use
               blurRadius: 24,
               spreadRadius: 2,
               offset: const Offset(0, 10),

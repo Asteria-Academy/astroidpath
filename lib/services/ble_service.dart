@@ -143,6 +143,7 @@ class BleService extends ChangeNotifier {
       await device.connect(
         timeout: const Duration(seconds: 15),
         autoConnect: false,
+        license: License.free
       );
 
       _connectedDevice = device;
