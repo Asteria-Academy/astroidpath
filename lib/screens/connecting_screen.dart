@@ -16,6 +16,7 @@ class ConnectingScreen extends StatefulWidget {
 class _ConnectingScreenState extends State<ConnectingScreen> {
   final BleService _bleService = BleService();
   bool _isNavigationScheduled = false;
+  String? _errorReason;
 
   @override
   void initState() {
@@ -36,12 +37,17 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
     if (_bleService.connectionState == BluetoothConnectionState.connected &&
         !_isNavigationScheduled) {
       _isNavigationScheduled = true;
-      // Auto-navigate back after successful connection
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
-          Navigator.of(context).pop(true); // Return true = success
+          Navigator.of(context).pop(true);
         }
       });
+    }
+
+    if (_bleService.connectionState ==
+        BluetoothConnectionState.connectionFailed) {
+      _errorReason =
+          _bleService.lastConnectionError ?? "Unknown error occurred";
     }
 
     setState(() {});
@@ -50,7 +56,7 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // Prevent back button during connection
+      canPop: false,
       child: Scaffold(
         backgroundColor: const Color(0xFF0B1433),
         body: Stack(
@@ -85,7 +91,7 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
           iconColor: const Color(0xFFF44336),
           glowColor: const Color(0xFFEF5350),
           message: "Connection Failed",
-          subtitle: "Could not connect to robot",
+          subtitle: _errorReason ?? "Could not connect to the robot.",
           buttonText: "Go Back",
           onButtonPressed: () => Navigator.of(context).pop(false),
         );

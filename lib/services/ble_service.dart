@@ -39,12 +39,14 @@ class BleService extends ChangeNotifier {
       BluetoothConnectionState.disconnected;
   int _batteryLevel = -1;
   String _lastReceivedData = '';
+  String? _lastConnectionError;
 
   // Getters
   BluetoothConnectionState get connectionState => _connectionState;
   BluetoothDevice? get connectedDevice => _connectedDevice;
   int get batteryLevel => _batteryLevel;
   String get lastReceivedData => _lastReceivedData;
+  String? get lastConnectionError => _lastConnectionError;
 
   // Backward compatibility getters
   bool get isScanning => _connectionState == BluetoothConnectionState.scanning;
@@ -136,29 +138,32 @@ class BleService extends ChangeNotifier {
 
   /// Connect to a device
   Future<bool> connectToDevice(BluetoothDevice device) async {
-    try {
-      _updateConnectionState(BluetoothConnectionState.connecting);
+    _lastConnectionError = null;
 
-      // Connect
+    if (isConnected) {
+      if (device.remoteId == _connectedDevice?.remoteId) {
+        return true;
+      }
+      await disconnect();
+    }
+
+    _updateConnectionState(BluetoothConnectionState.connecting);
+
+    try {
       await device.connect(
         timeout: const Duration(seconds: 15),
         autoConnect: false,
-        license: License.free
+        license: License.free,
       );
 
       _connectedDevice = device;
 
-      // Listen to connection state changes
-      _deviceStateSubscription = device.connectionState.listen((state) {
-        if (state == BluetoothConnectionState.disconnected) {
-          _handleDisconnection();
-        }
-      });
+      await Future.delayed(const Duration(milliseconds: 500));
 
-      // Discover services
-      List<BluetoothService> services = await device.discoverServices();
+      List<BluetoothService> services = await device.discoverServices().timeout(
+        const Duration(seconds: 20),
+      );
 
-      // Find Nordic UART Service
       BluetoothService? uartService;
       for (var service in services) {
         if (service.uuid.toString().toUpperCase() ==
@@ -169,7 +174,10 @@ class BleService extends ChangeNotifier {
       }
 
       if (uartService == null) {
-        throw Exception('Nordic UART Service not found');
+        _lastConnectionError =
+            "Could not find required UART service/characteristics. Check if device firmware is correct.";
+        await disconnect();
+        return false;
       }
 
       // Find RX and TX characteristics
@@ -193,26 +201,59 @@ class BleService extends ChangeNotifier {
       }
 
       if (_rxCharacteristic == null || _txCharacteristic == null) {
-        throw Exception('RX or TX characteristic not found');
+        _lastConnectionError =
+            "Could not find required UART service/characteristics. Check if device firmware is correct.";
+        await disconnect();
+        return false;
       }
+
+      _deviceStateSubscription = device.connectionState.listen((state) {
+        if (state == BluetoothConnectionState.disconnected) {
+          debugPrint("Device disconnected unexpectedly.");
+          _handleDisconnection();
+        }
+      });
 
       _updateConnectionState(BluetoothConnectionState.connected);
       debugPrint('✅ Successfully connected to ${device.platformName}');
 
-      // Request battery status
-      await Future.delayed(const Duration(milliseconds: 500));
       await sendCommand(RobotCommand.getBatteryStatus());
 
       return true;
     } catch (e) {
       debugPrint('❌ Connection error: $e');
+
+      // Parse error for user-friendly message
+      String errorMsg = e.toString();
+      if (errorMsg.contains('timeout') ||
+          errorMsg.contains('TimeoutException')) {
+        _lastConnectionError =
+            "Connection timeout. Device may be out of range or busy.";
+      } else if (errorMsg.contains('connect')) {
+        _lastConnectionError = "Failed to establish connection. Try again.";
+      } else if (errorMsg.contains('discover') ||
+          errorMsg.contains('service')) {
+        _lastConnectionError =
+            "Service discovery failed. Device may be incompatible.";
+      } else {
+        _lastConnectionError =
+            "Connection error: ${errorMsg.length > 100 ? '${errorMsg.substring(0, 100)}...' : errorMsg}";
+      }
+
+      try {
+        if (_connectedDevice != null) {
+          await _connectedDevice!.disconnect();
+        }
+      } catch (disconnectError) {
+        debugPrint("Error during cleanup disconnect: $disconnectError");
+      }
+
       _updateConnectionState(BluetoothConnectionState.connectionFailed);
-      await disconnect();
+      _handleDisconnection();
       return false;
     }
   }
 
-  /// Disconnect from device
   Future<void> disconnect() async {
     try {
       await _notificationSubscription?.cancel();
@@ -226,7 +267,6 @@ class BleService extends ChangeNotifier {
     }
   }
 
-  /// Send command to robot
   Future<bool> sendCommand(RobotCommand command) async {
     if (_connectionState != BluetoothConnectionState.connected ||
         _rxCharacteristic == null) {
@@ -248,17 +288,14 @@ class BleService extends ChangeNotifier {
     }
   }
 
-  /// Handle received data from robot
   void _handleReceivedData(List<int> data) {
     try {
       String received = utf8.decode(data);
       _lastReceivedData = received;
       debugPrint('📥 Received: $received');
 
-      // Parse JSON response
       final json = jsonDecode(received);
 
-      // Handle battery status response
       if (json['status'] == 'BATTERY') {
         _batteryLevel = json['level'] ?? -1;
         debugPrint('🔋 Battery: $_batteryLevel%');
@@ -270,7 +307,6 @@ class BleService extends ChangeNotifier {
     }
   }
 
-  /// Handle disconnection
   void _handleDisconnection() {
     _connectedDevice = null;
     _rxCharacteristic = null;
@@ -279,13 +315,11 @@ class BleService extends ChangeNotifier {
     _updateConnectionState(BluetoothConnectionState.disconnected);
   }
 
-  /// Update connection state
   void _updateConnectionState(BluetoothConnectionState newState) {
     _connectionState = newState;
     notifyListeners();
   }
 
-  /// Cleanup
   @override
   void dispose() {
     disconnect();
