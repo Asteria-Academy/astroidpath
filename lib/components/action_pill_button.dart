@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/sound_service.dart';
 
 class ActionPillButton extends StatelessWidget {
   const ActionPillButton({
@@ -42,14 +43,24 @@ class ActionPillButton extends StatelessWidget {
     final core = Material(
       color: backgroundColor,
       elevation: enabled ? effectiveElevation : 0,
-      shadowColor: Color.fromARGB( (isActive ? 0.35 : 0.2) * 255 ~/ 1, primaryColor.red, primaryColor.green, primaryColor.blue), // ignore: deprecated_member_use
+      shadowColor: Color.fromARGB(
+        (isActive ? 0.35 : 0.2) * 255 ~/ 1,
+        primaryColor.red,
+        primaryColor.green,
+        primaryColor.blue,
+      ), // ignore: deprecated_member_use
       shape: RoundedRectangleBorder(
         borderRadius: borderRadius,
         side: borderSide,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: enabled ? onTap : null,
+        onTap: enabled
+            ? () {
+                SoundService.instance.playClick();
+                onTap?.call();
+              }
+            : null,
         borderRadius: borderRadius,
         child: Padding(
           padding: padding,

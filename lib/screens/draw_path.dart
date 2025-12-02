@@ -13,6 +13,8 @@ import '../components/action_pill_button.dart';
 import '../services/ble_service.dart';
 import '../models/robot_command.dart';
 import '../router/app_router.dart';
+import '../services/sound_service.dart';
+import '../l10n/app_localizations.dart';
 
 class DrawPathScreenArgs {
   final bool openLoadPicker;
@@ -35,6 +37,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   final GlobalKey _boardKey = GlobalKey();
   final ImagePicker _picker = ImagePicker();
   final BleService _bleService = BleService();
+  AppLocalizations get l10n => AppLocalizations.of(context);
 
   Uint8List? _capturedImageBytes;
   String? _capturedImageName;
@@ -117,6 +120,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   @override
   void initState() {
     super.initState();
+    SoundService.instance.ensurePlaying();
     _bleService.addListener(_onBleStateChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.initialArgs?.openLoadPicker == true) {
@@ -233,7 +237,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
           _buildBackButton(),
           const SizedBox(width: 12),
           DoubleStrokeText(
-            text: 'MAP & DRAW PATH',
+            text: l10n.drawTitle,
             fontSize: math.min(MediaQuery.of(context).size.width * 0.03, 32.0),
             letterSpacing: 1.5,
             outerStrokeColor: const Color(0xFF0C2F66), // biru gelap
@@ -252,7 +256,9 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               borderRadius: BorderRadius.circular(28),
             ),
             child: Text(
-              'path length: ${_pathLengthMeters.toStringAsFixed(1)}m',
+              l10n.pathLengthLabel(
+                _pathLengthMeters.toStringAsFixed(1),
+              ),
               style: GoogleFonts.titanOne(
                 fontSize: MediaQuery.of(context).size.height * 0.025,
                 color: Colors.white,
@@ -301,7 +307,8 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   Widget _buildBleStatusBadge() {
     final isConnected = _bleService.isConnected;
     final batteryLevel = _bleService.batteryLevel;
-    final deviceName = _bleService.connectedDevice?.platformName ?? 'Unknown';
+    final deviceName =
+        _bleService.connectedDevice?.platformName ?? l10n.connectUnknownDevice;
 
     return GestureDetector(
       onTap: () {
@@ -339,7 +346,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  isConnected ? deviceName : 'Not Connected',
+                  isConnected ? deviceName : l10n.statusDisconnected,
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -592,7 +599,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                     onTap: () {
                       if (!_hasValidGrid) return;
                       if (_paintedCells.isEmpty) {
-                        _showSnack('Gambar jalur dulu sebelum menaruh finish.');
+                        _showSnack(l10n.drawPlaceFinishAfterPath);
                         return;
                       }
                       setState(() {
@@ -675,7 +682,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
                   child: !_hasImage
                       ? Center(
                           child: Text(
-                            'Klik Kamera Untuk Foto Area',
+                            l10n.drawCameraHint,
                             textAlign: TextAlign.center,
                             style: idleStyle,
                           ),
@@ -787,7 +794,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
 
   void _handleRunPathTap() {
     if (!_bleService.isConnected) {
-      _showSnack('⚠️ Hubungkan robot terlebih dahulu!');
+      _showSnack(l10n.drawConnectRobotFirst);
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
           Navigator.pushNamed(context, AppRoutes.connect);
@@ -798,7 +805,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
 
     final path = _getValidPath();
     if (path == null) {
-      _showSnack('❌ Lengkapi jalur dari start ke finish terlebih dahulu.');
+      _showSnack(l10n.drawCompletePathFirst);
       return;
     }
 
@@ -826,7 +833,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       }
 
       // Show feedback
-      _showSnack('📤 Mengirim jalur ke robot... (${path.length} waypoints)');
+      _showSnack(l10n.drawSendingPath('${path.length}'));
 
       // Create command
       final command = RobotCommand.executePath(path: physicalPath);
@@ -835,15 +842,15 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       final success = await _bleService.sendCommand(command);
 
       if (success) {
-        _showSnack('✅ Jalur berhasil dikirim! Robot akan mulai bergerak.');
+        _showSnack(l10n.drawSendSuccess);
         debugPrint('✅ Path execution command sent successfully');
       } else {
-        _showSnack('❌ Gagal mengirim jalur. Coba lagi.');
+        _showSnack(l10n.drawSendFailed);
         debugPrint('❌ Failed to send path execution command');
       }
     } catch (e) {
       debugPrint('❌ Execute path error: $e');
-      _showSnack('❌ Error: Gagal mengirim jalur ke robot.');
+      _showSnack(l10n.drawSendError);
     }
   }
 
@@ -899,7 +906,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
             if (showButtons) ...[
               const SizedBox(width: 12),
               ActionPillButton(
-                label: 'RUN PATH',
+                label: l10n.drawRunPath,
                 icon: Icons.play_arrow_rounded,
                 fontSize: 16,
                 onTap: runPathDisabled ? null : _handleRunPathTap,
@@ -908,7 +915,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               ),
               const SizedBox(width: 12),
               ActionPillButton(
-                label: 'LOAD',
+                label: l10n.drawLoadPath,
                 icon: Icons.folder_open_rounded,
                 fontSize: 16,
                 onTap: _openLoadPicker,
@@ -917,7 +924,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               ),
               const SizedBox(width: 12),
               ActionPillButton(
-                label: _isSimulating ? 'STOP' : 'SIMULATE',
+                label: _isSimulating ? l10n.drawStop : l10n.drawSimulate,
                 icon: _isSimulating
                     ? Icons.stop_rounded
                     : Icons.play_circle_fill,
@@ -930,7 +937,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
               ),
               const SizedBox(width: 12),
               ActionPillButton(
-                label: 'SAVE',
+                label: l10n.drawSave,
                 icon: Icons.save_rounded,
                 fontSize: 16,
                 onTap: saveDisabled ? null : _saveCurrentPath,
@@ -1064,7 +1071,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       final added = _paintCell(cell, allowIsolated: true);
       if (!added) return;
     } else if (!_paintedCells.contains(cell)) {
-      _showSnack('Letakkan ikon di jalur yang sudah digambar.');
+      _showSnack(l10n.drawPlaceMarkerOnPath);
       return;
     }
 
@@ -1102,17 +1109,17 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       cell,
     ).where(_paintedCells.contains).toList();
     if (!allowIsolated && _paintedCells.isNotEmpty && neighbors.isEmpty) {
-      _showSnack('Hubungkan jalur ke sel yang sudah dibuat.');
+      _showSnack(l10n.drawConnectPathToExisting);
       return false;
     }
     for (final neighbor in neighbors) {
       if (_degree(neighbor) >= 2) {
-        _showSnack('Jalur hanya boleh selebar satu kotak.');
+        _showSnack(l10n.drawOneCellWide);
         return false;
       }
     }
     if (neighbors.length > 2) {
-      _showSnack('Jalur hanya boleh selebar satu kotak.');
+      _showSnack(l10n.drawOneCellWide);
       return false;
     }
     setState(() {
@@ -1157,7 +1164,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   }) {
     if (!_paintedCells.contains(cell)) {
       if (showInvalidSnack) {
-        _showSnack('Letakkan finish di jalur yang sudah digambar.');
+        _showSnack(l10n.drawPlaceFinishOnPath);
       }
       return false;
     }
@@ -1353,19 +1360,20 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
         initialLength: _tableLengthCm,
         initialWidth: _tableWidthCm,
         initialSpeed: _robotSpeedPercent,
+        l10n: l10n,
       ),
     );
     if (result == null) return;
     if (!mounted) return;
     if (result.lengthCm < 5 || result.widthCm < 5) {
-      _showSnack('Minimum ukuran meja 5cm x 5cm.');
+      _showSnack(l10n.drawTableSizeMinimum);
       return;
     }
 
     final newRows = (result.lengthCm / 5).floor();
     final newCols = (result.widthCm / 5).floor();
     if (newRows <= 0 || newCols <= 0) {
-      _showSnack('Ukuran grid tidak valid.');
+      _showSnack(l10n.drawInvalidGridSize);
       return;
     }
 
@@ -1380,18 +1388,18 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
           await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Hapus Jalur?'),
-              content: const Text(
-                'Mengubah ukuran meja akan menghapus jalur yang sudah digambar. Lanjutkan?',
+              title: Text(l10n.drawClearPathTitle),
+              content: Text(
+                l10n.drawResizeWarning,
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('BATAL'),
+                  child: Text(l10n.btnCancel),
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('LANJUTKAN'),
+                  child: Text(l10n.btnContinue),
                 ),
               ],
             ),
@@ -1416,11 +1424,11 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   void _startSimulation() {
     final path = _getValidPath();
     if (path == null) {
-      _showSnack('Lengkapi jalur dari start ke finish terlebih dahulu.');
+      _showSnack(l10n.drawCompletePathFirst);
       return;
     }
     if (_startCell == null || _finishCell == null) {
-      _showSnack('Posisi start dan finish belum diatur.');
+      _showSnack(l10n.drawStartFinishRequired);
       return;
     }
 
@@ -1469,11 +1477,11 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
   Future<void> _saveCurrentPath() async {
     final path = _getValidPath();
     if (path == null) {
-      _showSnack('Jalur belum valid untuk disimpan.');
+      _showSnack(l10n.drawPathNotReadyToSave);
       return;
     }
     if (!_hasValidGrid || !_hasImage) {
-      _showSnack('Pastikan foto dan pengaturan sudah lengkap.');
+      _showSnack(l10n.drawMissingPhotoOrSettings);
       return;
     }
     try {
@@ -1499,10 +1507,10 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       };
       await file.writeAsString(jsonEncode(payload));
       if (mounted) {
-        _showSnack('File tersimpan: $fileName');
+        _showSnack(l10n.drawFileSaved(fileName));
       }
     } on Exception catch (e) {
-      _showSnack('Gagal menyimpan file: $e');
+      _showSnack(l10n.drawFileSaveError('$e'));
     }
   }
 
@@ -1512,18 +1520,18 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
           await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('Muat Jalur?'),
-              content: const Text(
-                'Membuka file baru akan menimpa jalur yang sedang aktif. Lanjutkan?',
+              title: Text(l10n.drawLoadConfirmTitle),
+              content: Text(
+                l10n.drawLoadConfirmBody,
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('BATAL'),
+                  child: Text(l10n.btnCancel),
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('MUAT'),
+                  child: Text(l10n.drawLoadPath),
                 ),
               ],
             ),
@@ -1549,7 +1557,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
           );
     if (files.isEmpty) {
       if (!mounted) return;
-      _showSnack('Belum ada file tersimpan.');
+      _showSnack(l10n.drawNoSavedFiles);
       return;
     }
     final selected = await showModalBottomSheet<String>(
@@ -1567,7 +1575,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
             return ListTile(
               title: Text(name, style: const TextStyle(color: Colors.white)),
               subtitle: Text(
-                'Terakhir: ${file.lastModifiedSync()}',
+                l10n.drawLastModified('${file.lastModifiedSync()}'),
                 style: const TextStyle(
                   color: Color(0x99FFFFFF),
                 ), // White with 60% opacity
@@ -1591,7 +1599,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       final settings = json['settings'] as Map<String, dynamic>?;
       final pathJson = json['path'] as List<dynamic>?;
       if (imageBase64 == null || settings == null || pathJson == null) {
-        throw const FormatException('File tidak lengkap.');
+        throw FormatException(l10n.drawFileIncomplete);
       }
 
       final rows = (settings['rows'] as num?)?.toInt();
@@ -1600,7 +1608,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
       final width = (settings['width_cm'] as num?)?.toDouble();
       final speed = (settings['robot_speed_percent'] as num?)?.toDouble();
       if (rows == null || cols == null || length == null || width == null) {
-        throw const FormatException('Pengaturan tidak valid.');
+      throw FormatException(l10n.drawInvalidConfig);
       }
 
       final cells = pathJson
@@ -1619,7 +1627,7 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
           )
           .toList();
       if (cells.isEmpty) {
-        throw const FormatException('Data jalur kosong.');
+        throw FormatException(l10n.drawEmptyPathData);
       }
 
       final startJson = json['start'] as Map<String, dynamic>?;
@@ -1655,11 +1663,13 @@ class _DrawPathScreenState extends State<DrawPathScreen> {
         _simulationIndex = 0;
         _markPathDirty();
       });
-      _showSnack('File berhasil dimuat: ${file.uri.pathSegments.last}');
+      _showSnack(
+        l10n.drawFileLoaded(file.uri.pathSegments.last),
+      );
     } on FormatException catch (e) {
-      _showSnack('File rusak: ${e.message}');
+      _showSnack(l10n.drawFileCorrupt(e.message ?? ''));
     } on Exception catch (e) {
-      _showSnack('Gagal membuka file: $e');
+      _showSnack(l10n.drawFileOpenError('$e'));
     }
   }
 
@@ -1998,15 +2008,16 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFF091326),
       appBar: AppBar(
         backgroundColor: const Color(0xFF091326),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Ambil Foto Area',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          l10n.drawCaptureTitle,
+          style: const TextStyle(color: Colors.white),
         ),
       ),
       body: Padding(
@@ -2024,7 +2035,7 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
                 ),
               ),
               child: Text(
-                'Ambil foto dari tampak atas (top-down) agar skala akurat.',
+                l10n.drawCaptureHint,
                 style: GoogleFonts.poppins(
                   color: const Color(0xE6FFFFFF), // White with 90% opacity
                   fontSize: 13,
@@ -2043,10 +2054,10 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
                     border: Border.all(color: Colors.white24),
                   ),
                   child: _previewBytes == null
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            'Belum ada foto',
-                            style: TextStyle(color: Colors.white60),
+                            l10n.drawNoPhoto,
+                            style: const TextStyle(color: Colors.white60),
                           ),
                         )
                       : Image.memory(_previewBytes!, fit: BoxFit.cover),
@@ -2060,7 +2071,7 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
                   child: ElevatedButton.icon(
                     onPressed: _isLoading ? null : _captureImage,
                     icon: const Icon(Icons.photo_camera, size: 20),
-                    label: const Text('Ambil Foto'),
+                    label: Text(l10n.drawCaptureButton),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF6A4CF3),
                       foregroundColor: Colors.white,
@@ -2083,7 +2094,7 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
                               Navigator.of(context).pop(_previewBytes);
                             },
                       icon: const Icon(Icons.check, size: 20),
-                      label: const Text('Gunakan'),
+                      label: Text(l10n.btnUse),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4CAF50),
                         foregroundColor: Colors.white,
@@ -2119,7 +2130,9 @@ class _CameraCapturePageState extends State<_CameraCapturePage> {
     } on PlatformException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal membuka kamera: ${e.message}')),
+        SnackBar(content: Text(AppLocalizations.of(context).drawCameraError(
+          e.message ?? '',
+        ))),
       );
     } finally {
       if (mounted) {
@@ -2148,11 +2161,13 @@ class _SettingsDialog extends StatefulWidget {
     this.initialLength,
     this.initialWidth,
     required this.initialSpeed,
+    required this.l10n,
   });
 
   final double? initialLength;
   final double? initialWidth;
   final double initialSpeed;
+  final AppLocalizations l10n;
 
   @override
   State<_SettingsDialog> createState() => _SettingsDialogState();
@@ -2250,7 +2265,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        'PENGATURAN AREA',
+                                        widget.l10n.drawAreaSettingsTitle,
                                         textAlign: TextAlign.center,
                                         style: GoogleFonts.titanOne(
                                           color: Colors.white,
@@ -2260,7 +2275,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                       ),
                                       const SizedBox(height: 12),
                                       _buildStepperField(
-                                        label: 'Area Length',
+                                        label: widget.l10n.drawAreaLength,
                                         value: _areaLength,
                                         onChanged: (val) => setState(
                                           () => _areaLength =
@@ -2271,7 +2286,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                       ),
                                       const SizedBox(height: 14),
                                       _buildStepperField(
-                                        label: 'Area Width',
+                                        label: widget.l10n.drawAreaWidth,
                                         value: _areaWidth,
                                         onChanged: (val) => setState(
                                           () => _areaWidth =
@@ -2288,10 +2303,11 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     mainAxisSize: MainAxisSize.min,
-                                    children: [
+                                  children: [
                                       const SizedBox(height: 18),
                                       Text(
-                                        'ROBOT SPEED (0% - 100%) : ${_speed.toStringAsFixed(0)}%',
+                                        widget.l10n
+                                            .drawRobotSpeed(_speed.toStringAsFixed(0)),
                                         textAlign: TextAlign.center,
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
@@ -2505,7 +2521,9 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     if (_areaLength <= 0 || _areaWidth <= 0) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Ukuran meja tidak valid.')));
+      ).showSnackBar(
+        SnackBar(content: Text(widget.l10n.drawInvalidTableSize)),
+      );
       return;
     }
     Navigator.pop(

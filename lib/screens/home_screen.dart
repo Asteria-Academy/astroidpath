@@ -2,15 +2,73 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:showcaseview/showcaseview.dart';
 import '../router/app_router.dart';
 import '../components/double_stroke_text.dart';
 import 'draw_path.dart';
+import '../services/sound_service.dart';
+import '../l10n/app_localizations.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  static const String _tutorialKey = 'home_showcase_shown';
+
+  final GlobalKey _connectNavKey = GlobalKey();
+  final GlobalKey _newPathKey = GlobalKey();
+  final GlobalKey _loadFileKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    SoundService.instance.ensurePlaying();
+    ShowcaseView.register(
+      enableAutoScroll: false,
+      disableBarrierInteraction: false,
+      disableMovingAnimation: true,
+      disableScaleAnimation: true,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeStartShowcase();
+    });
+  }
+
+  @override
+  void dispose() {
+    ShowcaseView.get().unregister();
+    super.dispose();
+  }
+
+  Future<void> _maybeStartShowcase() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasShown = prefs.getBool(_tutorialKey) ?? false;
+      if (hasShown || !mounted) return;
+
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+
+      ShowcaseView.get().startShowCase([
+        _connectNavKey,
+        _newPathKey,
+        _loadFileKey,
+      ]);
+      await prefs.setBool(_tutorialKey, true);
+    } catch (e) {
+      debugPrint('Failed to start showcase: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFF0B1433),
       body: Stack(
@@ -52,6 +110,8 @@ class HomeScreen extends StatelessWidget {
                         onTapConnect: () {
                           Navigator.pushNamed(context, AppRoutes.connect);
                         },
+                        connectShowcaseKey: _connectNavKey,
+                        l10n: l10n,
                       ),
                     ),
 
@@ -64,6 +124,33 @@ class HomeScreen extends StatelessWidget {
                         subtitleFont: subtitleFont,
                         ctaWidth: ctaW,
                         ctaHeight: ctaH,
+                        newPathKey: _newPathKey,
+                        loadFileKey: _loadFileKey,
+                      ),
+                    ),
+                    Positioned(
+                      right: 12,
+                      bottom: 12,
+                      child: _SettingsButton(
+                        onTap: () async {
+                          SoundService.instance.playClick();
+                          final result = await Navigator.pushNamed(
+                            context,
+                            AppRoutes.settings,
+                          );
+                          if (result == true && mounted) {
+                            await Future.delayed(
+                              const Duration(milliseconds: 300),
+                            );
+                            if (mounted) {
+                              ShowcaseView.get().startShowCase([
+                                _connectNavKey,
+                                _newPathKey,
+                                _loadFileKey,
+                              ]);
+                            }
+                          }
+                        },
                       ),
                     ),
                   ],
@@ -84,6 +171,8 @@ class _TopSegmentedNav extends StatelessWidget {
     required this.onTapHome,
     required this.onTapWorkspace,
     required this.onTapConnect,
+    this.connectShowcaseKey,
+    this.l10n,
   });
 
   final double width;
@@ -91,12 +180,24 @@ class _TopSegmentedNav extends StatelessWidget {
   final VoidCallback onTapHome;
   final VoidCallback onTapWorkspace;
   final VoidCallback onTapConnect;
+  final GlobalKey? connectShowcaseKey;
+  final AppLocalizations? l10n;
 
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(height * 0.45);
     final segmentHeight = height - (height * 0.28);
     final dividerColor = const Color.fromARGB(102, 164, 242, 255);
+    final titleStyle = GoogleFonts.titanOne(
+      fontSize: 16,
+      color: const Color(0xFFA5F1FF),
+      letterSpacing: 0.8,
+    );
+    final descStyle = GoogleFonts.inter(
+      fontSize: 13,
+      color: const Color(0xFFF5FDFF),
+      fontWeight: FontWeight.w400,
+    );
 
     return Container(
       width: width,
@@ -128,7 +229,7 @@ class _TopSegmentedNav extends StatelessWidget {
         children: [
           Expanded(
             child: _NavPill(
-              label: 'HOME',
+              label: l10n?.navHome ?? 'HOME',
               width: width * 0.2,
               icon: Icons.rocket_launch_outlined,
               active: true,
@@ -142,13 +243,51 @@ class _TopSegmentedNav extends StatelessWidget {
             width: width * 0.2,
           ),
           Expanded(
-            child: _NavPill(
-              label: 'CONNECT',
-              width: width * 0.2,
-              icon: Icons.wifi_tethering_outlined,
-              height: segmentHeight,
-              onTap: onTapConnect,
-            ),
+            child: connectShowcaseKey == null
+                ? _NavPill(
+                    label: l10n?.navConnect ?? 'CONNECT',
+                    width: width * 0.2,
+                    icon: Icons.wifi_tethering_outlined,
+                    height: segmentHeight,
+                    onTap: onTapConnect,
+                  )
+                : Showcase(
+                    key: connectShowcaseKey!,
+                    title: l10n?.showcaseConnectTitle ?? 'Connect',
+                    description:
+                        l10n?.showcaseConnectDesc ??
+                        'Pastikan robotmu tersambung sebelum mulai menggambar jalur.',
+                    targetBorderRadius: BorderRadius.circular(
+                      segmentHeight * 0.48,
+                    ),
+                    tooltipBackgroundColor: const Color(0xFF0F1D3C),
+                    tooltipBorderRadius: BorderRadius.circular(16),
+                    titleTextStyle: titleStyle,
+                    descTextStyle: descStyle,
+                    tooltipPadding: const EdgeInsets.all(20),
+                    showArrow: false,
+                    tooltipActionConfig: const TooltipActionConfig(
+                      position: TooltipActionPosition.outside,
+                      alignment: MainAxisAlignment.spaceBetween,
+                    ),
+                    tooltipActions: [
+                      TooltipActionButton(
+                        type: TooltipDefaultActionType.skip,
+                        name: l10n?.btnSkip ?? 'Skip',
+                      ),
+                      TooltipActionButton(
+                        type: TooltipDefaultActionType.next,
+                        name: l10n?.btnNext ?? 'Next',
+                      ),
+                    ],
+                    child: _NavPill(
+                      label: l10n?.navConnect ?? 'CONNECT',
+                      width: width * 0.2,
+                      icon: Icons.wifi_tethering_outlined,
+                      height: segmentHeight,
+                      onTap: onTapConnect,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -224,7 +363,12 @@ class _NavPill extends StatelessWidget {
 
     return InkWell(
       borderRadius: borderRadius,
-      onTap: onTap,
+      onTap: onTap == null
+          ? null
+          : () {
+              SoundService.instance.playClick();
+              onTap?.call();
+            },
       child: Container(
         width: width,
         height: height,
@@ -264,6 +408,8 @@ class _GalaxyPanel extends StatelessWidget {
     required this.subtitleFont,
     required this.ctaWidth,
     required this.ctaHeight,
+    required this.newPathKey,
+    required this.loadFileKey,
   });
 
   final double width;
@@ -271,10 +417,13 @@ class _GalaxyPanel extends StatelessWidget {
   final double subtitleFont;
   final double ctaWidth;
   final double ctaHeight;
+  final GlobalKey newPathKey;
+  final GlobalKey loadFileKey;
 
   @override
   Widget build(BuildContext context) {
     final shortestSide = math.min(width, height);
+    final l10n = AppLocalizations.of(context);
     final outerRadius = BorderRadius.circular(shortestSide * 0.08);
     final innerRadius = BorderRadius.circular(shortestSide * 0.07);
     final panelPadding = shortestSide * 0.05;
@@ -282,6 +431,16 @@ class _GalaxyPanel extends StatelessWidget {
     final logoSlotHeight = height * 0.18;
     final buttonSpacing = ctaWidth * 0.08;
     final runSpacing = ctaHeight * 0.35;
+    final titleStyle = GoogleFonts.titanOne(
+      fontSize: 16,
+      color: const Color(0xFFA5F1FF),
+      letterSpacing: 0.8,
+    );
+    final descStyle = GoogleFonts.inter(
+      fontSize: 13,
+      color: const Color(0xFFF5FDFF),
+      fontWeight: FontWeight.w400,
+    );
     void openNewPath() {
       Navigator.of(context).pushNamed(AppRoutes.drawPath);
     }
@@ -355,7 +514,7 @@ class _GalaxyPanel extends StatelessWidget {
             ),
             SizedBox(height: height * 0.04),
             DoubleStrokeText(
-              text: 'DRAW, CONTROL, AND COMMAND',
+              text: l10n.homeSubtitle,
               fontSize: subtitleFont,
               letterSpacing: 1.8,
               outerStrokeColor: const Color(0xFF0C2F66), // biru gelap
@@ -370,37 +529,89 @@ class _GalaxyPanel extends StatelessWidget {
               spacing: buttonSpacing,
               runSpacing: runSpacing,
               children: [
-                _CTAButton(
-                  width: ctaWidth,
-                  height: ctaHeight,
-                  label: 'NEW PATH',
-                  icon: Icons.add_circle_rounded,
-                  iconColor: const Color.fromARGB(255, 255, 255, 255),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color.fromARGB(255, 233, 130, 253),
-                      Color.fromARGB(255, 243, 167, 255),
-                    ],
+                Showcase(
+                  key: newPathKey,
+                  title: l10n.showcaseNewPathTitle,
+                  description: l10n.showcaseNewPathDesc,
+                  targetBorderRadius: BorderRadius.circular(ctaHeight * 0.5),
+                  tooltipBackgroundColor: const Color(0xFF0F1D3C),
+                  tooltipBorderRadius: BorderRadius.circular(16),
+                  titleTextStyle: titleStyle,
+                  descTextStyle: descStyle,
+                  tooltipPadding: const EdgeInsets.all(20),
+                  showArrow: false,
+                  tooltipActionConfig: const TooltipActionConfig(
+                    position: TooltipActionPosition.outside,
+                    alignment: MainAxisAlignment.spaceBetween,
                   ),
-                  borderColor: const Color(0xFFFDF5FF),
-                  shadowColor: const Color(0xFFE3CFFF),
-                  onTap: openNewPath,
+                  tooltipActions: [
+                    TooltipActionButton(
+                      type: TooltipDefaultActionType.previous,
+                      name: l10n.btnPrevious,
+                    ),
+                    TooltipActionButton(
+                      type: TooltipDefaultActionType.next,
+                      name: l10n.btnNext,
+                    ),
+                  ],
+                  child: _CTAButton(
+                    width: ctaWidth,
+                    height: ctaHeight,
+                    label: l10n.btnNewPath,
+                    icon: Icons.add_circle_rounded,
+                    iconColor: const Color.fromARGB(255, 255, 255, 255),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 233, 130, 253),
+                        Color.fromARGB(255, 243, 167, 255),
+                      ],
+                    ),
+                    borderColor: const Color(0xFFFDF5FF),
+                    shadowColor: const Color(0xFFE3CFFF),
+                    onTap: openNewPath,
+                  ),
                 ),
-                _CTAButton(
-                  width: ctaWidth,
-                  height: ctaHeight,
-                  label: 'LOAD FILE',
-                  icon: Icons.folder_open_rounded,
-                  iconColor: const Color.fromARGB(255, 255, 255, 255),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color.fromARGB(255, 48, 195, 221),
-                      Color(0xFF9FFCF6),
-                    ],
+                Showcase(
+                  key: loadFileKey,
+                  title: l10n.showcaseLoadTitle,
+                  description: l10n.showcaseLoadDesc,
+                  targetBorderRadius: BorderRadius.circular(ctaHeight * 0.5),
+                  tooltipBackgroundColor: const Color(0xFF0F1D3C),
+                  tooltipBorderRadius: BorderRadius.circular(16),
+                  titleTextStyle: titleStyle,
+                  descTextStyle: descStyle,
+                  tooltipPadding: const EdgeInsets.all(20),
+                  showArrow: false,
+                  tooltipActionConfig: const TooltipActionConfig(
+                    position: TooltipActionPosition.outside,
+                    alignment: MainAxisAlignment.spaceBetween,
                   ),
-                  borderColor: const Color(0xFFE4FFFF),
-                  shadowColor: const Color(0xFF7EE5F6),
-                  onTap: openLoadPath,
+                  tooltipActions: [
+                    TooltipActionButton(
+                      type: TooltipDefaultActionType.previous,
+                      name: l10n.btnPrevious,
+                    ),
+                    TooltipActionButton(
+                      type: TooltipDefaultActionType.skip,
+                      name: l10n.btnFinish,
+                    ),
+                  ],
+                  child: _CTAButton(
+                    width: ctaWidth,
+                    height: ctaHeight,
+                    label: l10n.btnLoadFile,
+                    icon: Icons.folder_open_rounded,
+                    iconColor: const Color.fromARGB(255, 255, 255, 255),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 48, 195, 221),
+                        Color(0xFF9FFCF6),
+                      ],
+                    ),
+                    borderColor: const Color(0xFFE4FFFF),
+                    shadowColor: const Color(0xFF7EE5F6),
+                    onTap: openLoadPath,
+                  ),
                 ),
               ],
             ),
@@ -445,7 +656,12 @@ class _CTAButton extends StatelessWidget {
 
     return InkWell(
       borderRadius: radius,
-      onTap: onTap,
+      onTap: onTap == null
+          ? null
+          : () {
+              SoundService.instance.playClick();
+              onTap?.call();
+            },
       child: Container(
         width: width,
         height: height,
@@ -455,7 +671,12 @@ class _CTAButton extends StatelessWidget {
           border: Border.all(color: borderColor, width: height * 0.06),
           boxShadow: [
             BoxShadow(
-              color: Color.fromARGB(140, shadowColor.red, shadowColor.green, shadowColor.blue), // ignore: deprecated_member_use
+              color: Color.fromARGB(
+                140,
+                shadowColor.red,
+                shadowColor.green,
+                shadowColor.blue,
+              ), // ignore: deprecated_member_use
               blurRadius: 24,
               spreadRadius: 2,
               offset: const Offset(0, 10),
@@ -506,6 +727,43 @@ class _CTAButton extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SettingsButton extends StatelessWidget {
+  const _SettingsButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(28),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF41D8FF), Color(0xFF4A7CFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromARGB(115, 128, 241, 255),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            ),
+          ],
+          border: Border.all(
+            color: const Color.fromARGB(204, 115, 240, 255),
+            width: 2,
+          ),
+        ),
+        child: const Icon(Icons.settings, color: Colors.white, size: 28),
       ),
     );
   }

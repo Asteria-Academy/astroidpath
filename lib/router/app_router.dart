@@ -8,7 +8,7 @@ import '../screens/home_screen.dart';
 import '../screens/draw_path.dart';
 import '../screens/connect_screen.dart';
 import '../screens/connecting_screen.dart';
-// import '../screens/settings_page.dart';
+import '../screens/settings_screen.dart';
 
 /// Kumpulan nama route supaya konsisten & mudah diubah
 class AppRoutes {
@@ -31,6 +31,9 @@ Route<dynamic> onGenerateRoute(RouteSettings settings) {
 
     case AppRoutes.connect:
       return _page(const ConnectScreen());
+
+    case AppRoutes.settings:
+      return _page(const SettingsScreen());
 
     case AppRoutes.connecting:
       final device = settings.arguments as BluetoothDevice?;

@@ -40,6 +40,11 @@ dependencies:
   path_provider: ^2.1.5
   flutter_blue_plus: ^2.0.0
   permission_handler: ^11.3.1
+  showcaseview: ^5.0.1
+  shared_preferences: ^2.3.3
+  flutter_localizations:
+    sdk: flutter
+  audioplayers: ^6.1.0
   flutter_launcher_icons: ^0.14.4
 dev_dependencies:
   flutter_test:
@@ -70,6 +75,8 @@ flutter:
     - assets/splash/
     - assets/brand/
     - assets/path/
+    - assets/sounds/
+    - assets/sounds/sfx/
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

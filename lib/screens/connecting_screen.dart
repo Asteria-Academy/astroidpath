@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart'
     hide BluetoothConnectionState;
 import '../services/ble_service.dart';
+import '../services/sound_service.dart';
+import '../l10n/app_localizations.dart';
 
 class ConnectingScreen extends StatefulWidget {
   const ConnectingScreen({super.key, required this.device});
@@ -21,6 +23,7 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
   @override
   void initState() {
     super.initState();
+    SoundService.instance.ensurePlaying();
     _bleService.addListener(_onBleServiceChanged);
     _bleService.connectToDevice(widget.device);
   }
@@ -55,6 +58,7 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -67,22 +71,22 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
             ),
 
             // Content
-            Center(child: _buildContent()),
+            Center(child: _buildContent(l10n)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(AppLocalizations l10n) {
     switch (_bleService.connectionState) {
       case BluetoothConnectionState.connected:
         return _StatusIndicator(
           icon: Icons.check_circle_rounded,
           iconColor: const Color(0xFF4CAF50),
           glowColor: const Color(0xFF81C784),
-          message: "Successfully Connected!",
-          subtitle: "Connected to ${widget.device.platformName}",
+          message: l10n.connectingSuccess,
+          subtitle: l10n.connectingTo(widget.device.platformName),
         );
 
       case BluetoothConnectionState.connectionFailed:
@@ -90,9 +94,9 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
           icon: Icons.error_rounded,
           iconColor: const Color(0xFFF44336),
           glowColor: const Color(0xFFEF5350),
-          message: "Connection Failed",
-          subtitle: _errorReason ?? "Could not connect to the robot.",
-          buttonText: "Go Back",
+          message: l10n.connectingFailed,
+          subtitle: _errorReason ?? l10n.connectingFailedSubtitle,
+          buttonText: l10n.connectingBack,
           onButtonPressed: () => Navigator.of(context).pop(false),
         );
 
@@ -102,9 +106,9 @@ class _ConnectingScreenState extends State<ConnectingScreen> {
           icon: null, // Will show loading spinner
           iconColor: const Color(0xFF00BCD4),
           glowColor: const Color(0xFF4DD0E1),
-          message: "Connecting...",
-          subtitle: "Establishing connection to ${widget.device.platformName}",
-          buttonText: "Cancel",
+          message: l10n.connectingProgress,
+          subtitle: l10n.connectingProgressSubtitle(widget.device.platformName),
+          buttonText: l10n.connectingCancel,
           onButtonPressed: () {
             _bleService.disconnect();
             Navigator.of(context).pop(false);
@@ -151,7 +155,12 @@ class _StatusIndicator extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Color.fromARGB(64, glowColor.red, glowColor.green, glowColor.blue), // ignore: deprecated_member_use
+            color: Color.fromARGB(
+              64,
+              glowColor.red,
+              glowColor.green,
+              glowColor.blue,
+            ), // ignore: deprecated_member_use
             blurRadius: 32,
             spreadRadius: 4,
           ),
@@ -167,7 +176,12 @@ class _StatusIndicator extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Color.fromARGB(128, glowColor.red, glowColor.green, glowColor.blue), // ignore: deprecated_member_use,
+                    color: Color.fromARGB(
+                      128,
+                      glowColor.red,
+                      glowColor.green,
+                      glowColor.blue,
+                    ), // ignore: deprecated_member_use,
                     blurRadius: 40,
                     spreadRadius: 10,
                   ),

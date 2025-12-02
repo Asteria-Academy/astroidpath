@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../services/ble_service.dart';
 import '../router/app_router.dart';
+import '../services/sound_service.dart';
+import '../l10n/app_localizations.dart';
 
 class ConnectScreen extends StatefulWidget {
   const ConnectScreen({super.key});
@@ -18,6 +20,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   @override
   void initState() {
     super.initState();
+    SoundService.instance.ensurePlaying();
     _bleService.addListener(_onBleServiceChanged);
   }
 
@@ -62,14 +65,16 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (mounted && success == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Connected to ${device.platformName}'),
+          content: Text(
+            AppLocalizations.of(context).connectSuccess(device.platformName),
+          ),
           backgroundColor: Colors.green,
         ),
       );
     } else if (mounted && success == false) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connection failed'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).connectFail),
           backgroundColor: Colors.red,
         ),
       );
@@ -78,6 +83,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -91,20 +97,20 @@ class _ConnectScreenState extends State<ConnectScreen> {
           child: Column(
             children: [
               // Header
-              _buildHeader(),
+              _buildHeader(l10n),
 
               // Connection Status
-              _buildConnectionStatus(),
+              _buildConnectionStatus(l10n),
 
               // Scan Results - Revert ke Expanded
               Expanded(
                 child: _isScanning || _scanResults.isNotEmpty
-                    ? _buildScanResults()
-                    : _buildEmptyState(),
+                    ? _buildScanResults(l10n)
+                    : _buildEmptyState(l10n),
               ),
 
               // Scan Button
-              _buildScanButton(),
+              _buildScanButton(l10n),
             ],
           ),
         ),
@@ -112,19 +118,22 @@ class _ConnectScreenState extends State<ConnectScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              SoundService.instance.playClick();
+              Navigator.pop(context);
+            },
           ),
           const SizedBox(width: 12),
-          const Text(
-            'Connect to Robot',
-            style: TextStyle(
+          Text(
+            l10n.connectTitle,
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -135,7 +144,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     );
   }
 
-  Widget _buildConnectionStatus() {
+  Widget _buildConnectionStatus(AppLocalizations l10n) {
     if (!_bleService.isConnected) return const SizedBox.shrink();
 
     return Container(
@@ -155,7 +164,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Connected to: ${_bleService.connectedDevice?.platformName ?? "Unknown"}',
+                  l10n.connectConnected(
+                    _bleService.connectedDevice?.platformName ??
+                        l10n.connectUnknownDevice,
+                  ),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -163,7 +175,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 ),
                 if (_bleService.batteryLevel >= 0)
                   Text(
-                    'Battery: ${_bleService.batteryLevel}%',
+                    l10n.connectBattery(_bleService.batteryLevel),
                     style: const TextStyle(
                       color: Color(0xB3FFFFFF), // White with 70% opacity
                       fontSize: 12,
@@ -174,14 +186,17 @@ class _ConnectScreenState extends State<ConnectScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () => _bleService.disconnect(),
+            onPressed: () {
+              SoundService.instance.playClick();
+              _bleService.disconnect();
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildScanResults() {
+  Widget _buildScanResults(AppLocalizations l10n) {
     // Filter untuk hanya tampilkan devices dengan nama
     final List<ScanResult> filteredResults = _scanResults
         .where((result) => result.device.platformName.isNotEmpty)
@@ -200,11 +215,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
     });
 
     if (filteredResults.isEmpty && !_isScanning) {
-      return const Center(
+      return Center(
         child: Text(
-          'No devices found.\nTry scanning again.',
+          l10n.connectNoDevices,
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70),
+          style: const TextStyle(color: Colors.white70),
         ),
       );
     }
@@ -245,7 +260,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             ),
             title: Text(
               device.platformName.isEmpty
-                  ? 'Unknown Device'
+                  ? l10n.connectUnknownDevice
                   : device.platformName,
               style: TextStyle(
                 color: Colors.white,
@@ -271,14 +286,17 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 ),
               ],
             ),
-            onTap: () => _connectToDevice(device),
+            onTap: () {
+              SoundService.instance.playClick();
+              _connectToDevice(device);
+            },
           ),
         );
       },
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -289,17 +307,17 @@ class _ConnectScreenState extends State<ConnectScreen> {
             color: Color(0x4DFFFFFF), // White with 30% opacity
           ),
           const SizedBox(height: 20),
-          const Text(
-            'No devices found yet',
-            style: TextStyle(
+          Text(
+            l10n.connectNoDevices,
+            style: const TextStyle(
               color: Color(0xB3FFFFFF), // White with 70% opacity
               fontSize: 18,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Press the scan button to start',
-            style: TextStyle(
+          Text(
+            l10n.connectHint,
+            style: const TextStyle(
               color: Color(0x80FFFFFF), // White with 50% opacity
               fontSize: 14,
             ),
@@ -309,14 +327,19 @@ class _ConnectScreenState extends State<ConnectScreen> {
     );
   }
 
-  Widget _buildScanButton() {
+  Widget _buildScanButton(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(20), // Revert ke padding semula
       child: SizedBox(
         width: double.infinity,
         height: 56,
         child: ElevatedButton(
-          onPressed: _isScanning ? null : _startScan,
+          onPressed: _isScanning
+              ? null
+              : () {
+                  SoundService.instance.playClick();
+                  _startScan();
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.cyan,
             disabledBackgroundColor: const Color(0x8000BCD4),
@@ -325,10 +348,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
             ),
           ),
           child: _isScanning
-              ? const Row(
+              ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
@@ -336,16 +359,16 @@ class _ConnectScreenState extends State<ConnectScreen> {
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(width: 12),
-                    Text('Scanning...'),
+                    const SizedBox(width: 12),
+                    Text(l10n.connectScanning),
                   ],
                 )
-              : const Row(
+              : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.search),
-                    SizedBox(width: 8),
-                    Text('Start Scan'),
+                    const Icon(Icons.search),
+                    const SizedBox(width: 8),
+                    Text(l10n.connectScan),
                   ],
                 ),
         ),
