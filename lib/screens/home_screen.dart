@@ -77,6 +77,19 @@ class _HomeScreenState extends State<HomeScreen> {
           Positioned.fill(
             child: Image.asset('assets/splash/bg.png', fit: BoxFit.cover),
           ),
+          Positioned(
+            left: 12,
+            bottom: 12,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: 0.85,
+                child: Image.asset(
+                  'assets/brand/mascotnobg.png',
+                  width: MediaQuery.of(context).size.width * 0.18,
+                ),
+              ),
+            ),
+          ),
           SafeArea(
             child: LayoutBuilder(
               builder: (context, c) {
