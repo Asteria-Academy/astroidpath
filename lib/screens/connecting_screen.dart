@@ -155,12 +155,7 @@ class _StatusIndicator extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Color.fromARGB(
-              64,
-              glowColor.red,
-              glowColor.green,
-              glowColor.blue,
-            ), // ignore: deprecated_member_use
+            color: Color.fromARGB( 64, glowColor.red, glowColor.green, glowColor.blue ), // ignore: deprecated_member_use
             blurRadius: 32,
             spreadRadius: 4,
           ),
@@ -176,12 +171,7 @@ class _StatusIndicator extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Color.fromARGB(
-                      128,
-                      glowColor.red,
-                      glowColor.green,
-                      glowColor.blue,
-                    ), // ignore: deprecated_member_use,
+                    color: Color.fromARGB( 128, glowColor.red, glowColor.green, glowColor.blue ), // ignore: deprecated_member_use,
                     blurRadius: 40,
                     spreadRadius: 10,
                   ),

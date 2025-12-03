@@ -11,7 +11,6 @@ class RobotCommand {
     return jsonEncode(json);
   }
 
-
   factory RobotCommand.driveDirect({
     required int leftSpeed,
     required int rightSpeed,
@@ -45,5 +44,12 @@ class RobotCommand {
 
   factory RobotCommand.getBatteryStatus() {
     return RobotCommand(command: 'GET_BATTERY_STATUS', params: {});
+  }
+
+  factory RobotCommand.playInternalSound({required int soundId}) {
+    return RobotCommand(
+      command: 'PLAY_INTERNAL_SOUND',
+      params: {'sound_id': soundId},
+    );
   }
 }

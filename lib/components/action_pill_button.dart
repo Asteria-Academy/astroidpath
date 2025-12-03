@@ -43,12 +43,7 @@ class ActionPillButton extends StatelessWidget {
     final core = Material(
       color: backgroundColor,
       elevation: enabled ? effectiveElevation : 0,
-      shadowColor: Color.fromARGB(
-        (isActive ? 0.35 : 0.2) * 255 ~/ 1,
-        primaryColor.red,
-        primaryColor.green,
-        primaryColor.blue,
-      ), // ignore: deprecated_member_use
+      shadowColor: Color.fromARGB( (isActive ? 0.35 : 0.2) * 255 ~/ 1, primaryColor.red, primaryColor.green, primaryColor.blue ), // ignore: deprecated_member_use
       shape: RoundedRectangleBorder(
         borderRadius: borderRadius,
         side: borderSide,

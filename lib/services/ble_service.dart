@@ -217,6 +217,7 @@ class BleService extends ChangeNotifier {
       _updateConnectionState(BluetoothConnectionState.connected);
       debugPrint('✅ Successfully connected to ${device.platformName}');
 
+      await sendCommand(RobotCommand.playInternalSound(soundId: 3));
       await sendCommand(RobotCommand.getBatteryStatus());
 
       return true;
